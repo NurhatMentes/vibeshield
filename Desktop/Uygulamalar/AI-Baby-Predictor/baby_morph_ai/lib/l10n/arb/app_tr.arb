@@ -1,0 +1,91 @@
+{
+  "@@locale": "tr",
+  "appTitle": "BabyMorph AI",
+  "@appTitle": {
+    "description": "Uygulama başlığı"
+  },
+  "splashSubtitle": "AI Baby Predictor – Just for Fun!",
+  "@splashSubtitle": {
+    "description": "Açılış ekranı alt başlığı"
+  },
+  "welcomeText": "Hoş Geldiniz!",
+  "@welcomeText": {
+    "description": "Hoş geldin mesajı"
+  },
+  "motherPhoto": "Anne Fotoğrafı",
+  "@motherPhoto": {
+    "description": "Anne fotoğrafı butonu"
+  },
+  "fatherPhoto": "Baba Fotoğrafı",
+  "@fatherPhoto": {
+    "description": "Baba fotoğrafı butonu"
+  },
+  "seeTheBaby": "Bebeği Gör",
+  "@seeTheBaby": {
+    "description": "Bebek görme butonu"
+  },
+  "selectPhoto": "Fotoğraf Seç",
+  "@selectPhoto": {
+    "description": "Fotoğraf seçme mesajı"
+  },
+  "processing": "İşleniyor...",
+  "@processing": {
+    "description": "İşlem devam ediyor mesajı"
+  },
+  "save": "Kaydet",
+  "@save": {
+    "description": "Kaydet butonu"
+  },
+  "share": "Paylaş",
+  "@share": {
+    "description": "Paylaş butonu"
+  },
+  "premium": "Premium",
+  "@premium": {
+    "description": "Premium buton"
+  },
+  "premiumFeatures": "Premium Özellikler",
+  "@premiumFeatures": {
+    "description": "Premium özellikler başlığı"
+  },
+  "premiumDescription": "Sınırsız yüksek çözünürlük ve reklamsız kullanım",
+  "@premiumDescription": {
+    "description": "Premium açıklaması"
+  },
+  "premiumPrice": "299,90 ₺",
+  "@premiumPrice": {
+    "description": "Premium fiyatı"
+  },
+  "subscribe": "Abone Ol",
+  "@subscribe": {
+    "description": "Abone ol butonu"
+  },
+  "forEntertainment": "Yalnızca eğlence amaçlıdır",
+  "@forEntertainment": {
+    "description": "Eğlence amaçlı uyarısı"
+  },
+  "privacyPolicy": "Gizlilik Politikası",
+  "@privacyPolicy": {
+    "description": "Gizlilik politikası"
+  },
+  "error": "Hata",
+  "@error": {
+    "description": "Hata mesajı"
+  },
+  "errorOccurred": "Bir hata oluştu",
+  "@errorOccurred": {
+    "description": "Genel hata mesajı"
+  },
+  "selectBothPhotos": "Lütfen her iki fotoğrafı da seçiniz",
+  "@selectBothPhotos": {
+    "description": "İki fotoğraf seçilmediğinde uyarı"
+  },
+  "photoSaved": "Fotoğraf kaydedildi",
+  "@photoSaved": {
+    "description": "Fotoğraf kaydetme başarılı mesajı"
+  },
+  "loading": "Yükleniyor...",
+  "@loading": {
+    "description": "Yükleme mesajı"
+  }
+}

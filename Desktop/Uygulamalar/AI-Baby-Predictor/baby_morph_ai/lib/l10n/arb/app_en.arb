@@ -1,0 +1,91 @@
+{
+  "@@locale": "en",
+  "appTitle": "BabyMorph AI",
+  "@appTitle": {
+    "description": "Application title"
+  },
+  "splashSubtitle": "AI Baby Predictor – Just for Fun!",
+  "@splashSubtitle": {
+    "description": "Splash screen subtitle"
+  },
+  "welcomeText": "Welcome!",
+  "@welcomeText": {
+    "description": "Welcome message"
+  },
+  "motherPhoto": "Mother's Photo",
+  "@motherPhoto": {
+    "description": "Mother photo button"
+  },
+  "fatherPhoto": "Father's Photo",
+  "@fatherPhoto": {
+    "description": "Father photo button"
+  },
+  "seeTheBaby": "See The Baby",
+  "@seeTheBaby": {
+    "description": "See baby button"
+  },
+  "selectPhoto": "Select Photo",
+  "@selectPhoto": {
+    "description": "Select photo message"
+  },
+  "processing": "Processing...",
+  "@processing": {
+    "description": "Processing message"
+  },
+  "save": "Save",
+  "@save": {
+    "description": "Save button"
+  },
+  "share": "Share",
+  "@share": {
+    "description": "Share button"
+  },
+  "premium": "Premium",
+  "@premium": {
+    "description": "Premium button"
+  },
+  "premiumFeatures": "Premium Features",
+  "@premiumFeatures": {
+    "description": "Premium features title"
+  },
+  "premiumDescription": "Unlimited high resolution and ad-free usage",
+  "@premiumDescription": {
+    "description": "Premium description"
+  },
+  "premiumPrice": "$9.99",
+  "@premiumPrice": {
+    "description": "Premium price"
+  },
+  "subscribe": "Subscribe",
+  "@subscribe": {
+    "description": "Subscribe button"
+  },
+  "forEntertainment": "For entertainment purposes only",
+  "@forEntertainment": {
+    "description": "Entertainment purpose warning"
+  },
+  "privacyPolicy": "Privacy Policy",
+  "@privacyPolicy": {
+    "description": "Privacy policy"
+  },
+  "error": "Error",
+  "@error": {
+    "description": "Error message"
+  },
+  "errorOccurred": "An error occurred",
+  "@errorOccurred": {
+    "description": "Generic error message"
+  },
+  "selectBothPhotos": "Please select both photos",
+  "@selectBothPhotos": {
+    "description": "Warning when both photos are not selected"
+  },
+  "photoSaved": "Photo saved",
+  "@photoSaved": {
+    "description": "Photo save success message"
+  },
+  "loading": "Loading...",
+  "@loading": {
+    "description": "Loading message"
+  }
+}
