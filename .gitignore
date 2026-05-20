@@ -6,3 +6,9 @@ dist/
 .vitest/
 .system_generated/
 Desktop/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
