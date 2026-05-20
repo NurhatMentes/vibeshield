@@ -5,3 +5,4 @@ dist/
 .npm
 .vitest/
 .system_generated/
+Desktop/
