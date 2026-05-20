@@ -1,0 +1,41 @@
+# VibeShield AI Code Generation Rules
+
+You are in a workspace that uses VibeShield to secure and optimize Next.js App Router API Routes.
+
+## CRITICAL RULE: Wrap API Handlers
+
+Whenever generating or editing a Next.js App Router API Route file (`route.ts` or `route.js`), you **MUST** wrap all exported HTTP handlers (`GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`) with the `vibeShield` interceptor.
+
+### Example Correct Route Pattern
+
+```typescript
+import { NextResponse } from 'next/server';
+import { vibeShield } from 'vibeshield-core'; // or relative path if local
+
+export const GET = vibeShield(async (req, context) => {
+  // 1. Request queries (req.url, req.nextUrl.searchParams) are auto-sanitized.
+  // 2. Route parameters (await context.params) are auto-sanitized.
+  const { searchParams } = new URL(req.url);
+  const q = searchParams.get('q');
+  
+  return NextResponse.json({ message: "Hello, World", query: q });
+}, {
+  cache: {
+    enabled: true,
+    ttl: 30 // Cache GET results for 30s
+  }
+});
+
+export const POST = vibeShield(async (req) => {
+  // 3. Request body (req.json(), req.formData(), req.text()) is auto-sanitized.
+  const body = await req.json();
+  
+  // Safe from XSS, SQLi, NoSQLi operators (like $gt, $ne)
+  return NextResponse.json({ received: body });
+});
+```
+
+## Security Best Practices
+- Let VibeShield handle unhandled errors. Never expose full internal error stacks inside route catch blocks. If you write manual try-catches, ensure errors are rethrown or handled safely with VibeShield's `handleError`.
+- For sensitive endpoints where caching might leak personal info, leave `cache.enabled` as `false` (default behavior).
+- VibeShield blocks MongoDB operator injection automatically by stripping keys starting with `$`. Avoid overriding the body sanitization rule for database write handlers.

@@ -1,0 +1,29 @@
+{
+  "name": "vibeshield-core",
+  "version": "1.0.0",
+  "description": "Zero-configuration security and performance layer for Next.js App Router API Routes",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "nextjs",
+    "security",
+    "xss",
+    "sqli",
+    "nosql",
+    "cache",
+    "middleware",
+    "vibe-coding"
+  ],
+  "author": "VibeShield Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.1"
+  }
+}
