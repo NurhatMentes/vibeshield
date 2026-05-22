@@ -80,7 +80,53 @@ async function runSecurityShowcase() {
 }
 
 // ==========================================
-// 2. MOCK HANDLERS FOR PERFORMANCE BENCHMARK
+// 2. MOCK HANDLERS FOR CRYPTOGRAPHY SHOWCASE
+// ==========================================
+
+async function mockDatabaseHandler(req: Request): Promise<Response> {
+  const body = await req.json();
+  console.log('  [DB/Handler Memory View]:', JSON.stringify(body)); // Proves memory only contains cipher-text
+  return new Response(JSON.stringify({ status: 'success', data: body }), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+const cryptoProtectedHandler = vibeShield(mockDatabaseHandler, {
+  crypto: {
+    secretKey: 'showcase_super_secret_encryption_key',
+    encryptFields: ['creditCard', 'ssn']
+  }
+});
+
+async function runCryptoShowcase() {
+  console.log('=============================================================');
+  console.log('🔐 VIBESHIELD TRANSPARENT FIELD ENCRYPTION SHOWCASE');
+  console.log('=============================================================\n');
+
+  const sensitiveBody = { 
+    user: "John Doe", 
+    ssn: "999-88-7777",
+    creditCard: "4111-2222-3333-4444" 
+  };
+  
+  const req = () => new Request('http://localhost/checkout', {
+    method: 'POST',
+    body: JSON.stringify(sensitiveBody),
+    headers: { 'Content-Type': 'application/json' }
+  });
+
+  console.log('--- FIELD-LEVEL ENCRYPTION ---');
+  console.log('Client Payload Sent:', JSON.stringify(sensitiveBody));
+  
+  console.log('\nExecuting VibeShield Protected Endpoint...');
+  const res = await cryptoProtectedHandler(req());
+  
+  console.log('\nClient Response Received (Decrypted):', await res.text());
+  console.log();
+}
+
+// ==========================================
+// 3. MOCK HANDLERS FOR PERFORMANCE BENCHMARK
 // ==========================================
 
 let dbQueryCount = 0;
@@ -166,6 +212,7 @@ async function runPerformanceBenchmark() {
 // Run the suite
 async function main() {
   await runSecurityShowcase();
+  await runCryptoShowcase();
   await runPerformanceBenchmark();
 }
 

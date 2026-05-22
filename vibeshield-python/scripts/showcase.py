@@ -69,7 +69,45 @@ async def run_security_showcase():
         print()
 
 # ==========================================
-# 2. PERFORMANCE BENCHMARK
+# 2. CRYPTOGRAPHY SHOWCASE
+# ==========================================
+
+async def run_crypto_showcase():
+    print('=============================================================')
+    print('🔐 VIBESHIELD TRANSPARENT FIELD ENCRYPTION SHOWCASE')
+    print('=============================================================\n')
+
+    crypto_app = FastAPI()
+    crypto_app.add_middleware(
+        VibeShieldASGIMiddleware, 
+        crypto_secret='showcase_super_secret_encryption_key', 
+        crypto_fields=['creditCard', 'ssn']
+    )
+
+    @crypto_app.post("/checkout")
+    async def checkout_protected(request: Request):
+        body = await request.json()
+        print('  [DB/Handler Memory View]:', json.dumps(body))
+        return {"status": "success", "data": body}
+
+    sensitive_body = { 
+        "user": "John Doe", 
+        "ssn": "999-88-7777",
+        "creditCard": "4111-2222-3333-4444" 
+    }
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=crypto_app), base_url="http://localhost") as client:
+        print('--- FIELD-LEVEL ENCRYPTION ---')
+        print('Client Payload Sent:', json.dumps(sensitive_body))
+        print('\nExecuting VibeShield Protected Endpoint...')
+        
+        res = await client.post("/checkout", json=sensitive_body)
+        
+        print('\nClient Response Received (Decrypted):', res.text)
+        print()
+
+# ==========================================
+# 3. PERFORMANCE BENCHMARK
 # ==========================================
 
 db_query_count = 0
@@ -154,6 +192,7 @@ async def run_performance_benchmark():
 
 async def main():
     await run_security_showcase()
+    await run_crypto_showcase()
     await run_performance_benchmark()
 
 if __name__ == "__main__":

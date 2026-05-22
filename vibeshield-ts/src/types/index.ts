@@ -57,8 +57,21 @@ export interface ErrorOptions {
   logErrors?: boolean;
 }
 
+export interface CryptoOptions {
+  /**
+   * Secret key used for HMAC signing and AES-256 encryption.
+   */
+  secretKey: string;
+
+  /**
+   * List of specific object keys (e.g., "creditCard", "ssn") to automatically encrypt in request bodies and decrypt in responses.
+   */
+  encryptFields?: string[];
+}
+
 export interface VibeShieldOptions {
   security?: SecurityOptions;
+  crypto?: CryptoOptions;
   cache?: CacheOptions;
   errors?: ErrorOptions;
 }

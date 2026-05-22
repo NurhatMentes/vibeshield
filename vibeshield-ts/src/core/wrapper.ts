@@ -2,6 +2,7 @@ import { VibeShieldOptions } from '../types/index.js';
 import { sanitize, sanitizeString, sanitizeUrl } from './sanitizer.js';
 import { globalCache } from './cache.js';
 import { handleError } from './errorHandler.js';
+import { processCryptoFields } from './security/crypto.js';
 
 /**
  * Creates a sanitized ES6 Proxy wrapper over the original Request object.
@@ -24,7 +25,13 @@ function createSanitizedRequest(req: Request, options?: VibeShieldOptions): Requ
             cachedJsonPromise = target
               .clone()
               .json()
-              .then((data: any) => sanitize(data, securityOpts));
+              .then((data: any) => sanitize(data, securityOpts))
+              .then((data: any) => {
+                if (options?.crypto?.encryptFields && options.crypto.secretKey) {
+                  return processCryptoFields(data, options.crypto.encryptFields, true, options.crypto.secretKey);
+                }
+                return data;
+              });
           }
           return cachedJsonPromise;
         };
@@ -165,7 +172,25 @@ export function vibeShield(
       const sanitizedReq = createSanitizedRequest(req, options);
 
       // 4. Handler Execution
-      const response = await handler(sanitizedReq, sanitizedContext);
+      let response = await handler(sanitizedReq, sanitizedContext);
+
+      // 4b. Transparent Response Decryption
+      if (options?.crypto?.encryptFields && options.crypto.secretKey) {
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          try {
+            const resData = await response.clone().json();
+            const decryptedData = processCryptoFields(resData, options.crypto.encryptFields, false, options.crypto.secretKey);
+            response = new Response(JSON.stringify(decryptedData), {
+              status: response.status,
+              statusText: response.statusText,
+              headers: response.headers,
+            });
+          } catch (e) {
+            // Silently fallback if JSON parsing fails
+          }
+        }
+      }
 
       // 5. In-Memory Cache Write (Only for successful GET responses)
       if (cacheEnabled && isGet && response.ok) {

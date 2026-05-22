@@ -6,6 +6,7 @@ import io
 from .sanitizer import sanitize
 from .cache import VibeShieldCache, CachedResponse
 from .errors import handle_exception
+from .security.crypto import process_crypto_fields
 
 # Global cache instance
 global_cache = VibeShieldCache()
@@ -13,18 +14,22 @@ global_cache = VibeShieldCache()
 class VibeShieldASGIMiddleware:
     """
     ASGI Middleware for FastAPI / Starlette.
-    Provides plug-and-play sanitization, error masking, and caching.
+    Provides plug-and-play sanitization, error masking, caching, and transparent field encryption.
     """
-    def __init__(self, app, cache_enabled: bool = False, cache_ttl: float = 60.0, key_generator = None):
+    def __init__(self, app, cache_enabled: bool = False, cache_ttl: float = 60.0, key_generator = None, crypto_secret: str = None, crypto_fields: list = None):
         self.app = app
         self.cache_enabled = cache_enabled
         self.cache_ttl = cache_ttl
         self.key_generator = key_generator
+        self.crypto_secret = crypto_secret
+        self.crypto_fields = crypto_fields or []
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
+
+        is_crypto_active = bool(self.crypto_secret and self.crypto_fields)
 
         # 1. Sanitize Query Parameters on-the-fly
         query_string = scope.get("query_string", b"").decode("utf-8")
@@ -45,7 +50,6 @@ class VibeShieldASGIMiddleware:
         if self.cache_enabled and method == "GET":
             if self.key_generator:
                 try:
-                    # In python, we pass a simplified dict-based request proxy to match JS signature
                     req_proxy = {"method": method, "path": path, "query_string": query_string}
                     cache_key = self.key_generator(req_proxy)
                 except Exception:
@@ -69,7 +73,6 @@ class VibeShieldASGIMiddleware:
                 return
 
         # 4. Intercept Request Body
-        # We need to buffer and sanitize the body for POST/PUT/PATCH
         sanitized_receive = receive
         if method in ("POST", "PUT", "PATCH"):
             body = b""
@@ -80,7 +83,6 @@ class VibeShieldASGIMiddleware:
                     body += message.get("body", b"")
                     more_body = message.get("more_body", False)
             
-            # Sanitize the body depending on content-type
             headers_dict = {k.decode("utf-8").lower(): v.decode("utf-8") for k, v in scope.get("headers", [])}
             content_type = headers_dict.get("content-type", "")
             
@@ -90,6 +92,8 @@ class VibeShieldASGIMiddleware:
                     try:
                         data = json.loads(body.decode("utf-8"))
                         sanitized_data = sanitize(data)
+                        if is_crypto_active:
+                            sanitized_data = process_crypto_fields(sanitized_data, self.crypto_fields, True, self.crypto_secret)
                         sanitized_body = json.dumps(sanitized_data).encode("utf-8")
                     except Exception:
                         sanitized_body = sanitize(body.decode("utf-8", errors="ignore")).encode("utf-8")
@@ -104,7 +108,6 @@ class VibeShieldASGIMiddleware:
                 else:
                     sanitized_body = sanitize(body.decode("utf-8", errors="ignore")).encode("utf-8")
 
-            # Create helper to feed the sanitized body back to the app
             class SanitizedReceive:
                 def __init__(self, b: bytes):
                     self.b = b
@@ -130,27 +133,62 @@ class VibeShieldASGIMiddleware:
             if message["type"] == "http.response.start":
                 status_code[0] = message.get("status", 200)
                 response_headers[0] = message.get("headers", [])
+                if not is_crypto_active:
+                    await send(message)
             elif message["type"] == "http.response.body":
                 body_chunks.append(message.get("body", b""))
-            await send(message)
+                if not is_crypto_active:
+                    await send(message)
 
         try:
             await self.app(scope, sanitized_receive, custom_send)
             
+            full_body = b"".join(body_chunks)
+
+            # 6. Response Decryption
+            if is_crypto_active:
+                content_type = next((v.decode("utf-8") for k, v in response_headers[0] if k.decode("utf-8").lower() == "content-type"), "")
+                if "application/json" in content_type:
+                    try:
+                        res_data = json.loads(full_body.decode("utf-8"))
+                        decrypted_data = process_crypto_fields(res_data, self.crypto_fields, False, self.crypto_secret)
+                        full_body = json.dumps(decrypted_data).encode("utf-8")
+                        new_headers = []
+                        for k, v in response_headers[0]:
+                            if k.decode("utf-8").lower() == "content-length":
+                                new_headers.append((k, str(len(full_body)).encode("utf-8")))
+                            else:
+                                new_headers.append((k, v))
+                        response_headers[0] = new_headers
+                    except Exception:
+                        pass
+                
+                # Send the buffered and decrypted response
+                await send({
+                    "type": "http.response.start",
+                    "status": status_code[0],
+                    "headers": response_headers[0]
+                })
+                await send({
+                    "type": "http.response.body",
+                    "body": full_body,
+                    "more_body": False
+                })
+
             # Cache the response on successful GET
             if self.cache_enabled and method == "GET" and status_code[0] == 200 and cache_key:
-                full_body = b"".join(body_chunks)
                 global_cache.set(cache_key, CachedResponse(status_code[0], response_headers[0], full_body), self.cache_ttl)
                 
         except Exception as e:
             masked_payload, tracking_id = handle_exception(e)
             error_body = json.dumps(masked_payload).encode("utf-8")
             
-            await send({
-                "type": "http.response.start",
-                "status": 500,
-                "headers": [(b"content-type", b"application/json")]
-            })
+            if not is_crypto_active or not response_headers[0]: # Ensure start hasn't been sent if active
+                await send({
+                    "type": "http.response.start",
+                    "status": 500,
+                    "headers": [(b"content-type", b"application/json")]
+                })
             await send({
                 "type": "http.response.body",
                 "body": error_body,
@@ -161,15 +199,19 @@ class VibeShieldASGIMiddleware:
 class VibeShieldWSGIMiddleware:
     """
     WSGI Middleware for Flask.
-    Provides plug-and-play sanitization, error masking, and caching.
+    Provides plug-and-play sanitization, error masking, caching, and transparent field encryption.
     """
-    def __init__(self, app, cache_enabled: bool = False, cache_ttl: float = 60.0, key_generator = None):
+    def __init__(self, app, cache_enabled: bool = False, cache_ttl: float = 60.0, key_generator = None, crypto_secret: str = None, crypto_fields: list = None):
         self.app = app
         self.cache_enabled = cache_enabled
         self.cache_ttl = cache_ttl
         self.key_generator = key_generator
+        self.crypto_secret = crypto_secret
+        self.crypto_fields = crypto_fields or []
 
     def __call__(self, environ, start_response):
+        is_crypto_active = bool(self.crypto_secret and self.crypto_fields)
+
         # 1. Sanitize Query Parameters on-the-fly
         query_string = environ.get("QUERY_STRING", "")
         if query_string:
@@ -194,11 +236,10 @@ class VibeShieldWSGIMiddleware:
 
             cached = global_cache.get(cache_key)
             if cached:
-                # Cache hit - start response and return cached body
                 start_response(f"{cached.status} OK", cached.headers)
                 return [cached.body]
 
-        # 3. Sanitize Request Body for POST/PUT/PATCH
+        # 3. Sanitize and Encrypt Request Body
         content_length = int(environ.get("CONTENT_LENGTH", 0) or 0)
         if content_length > 0 and method in ("POST", "PUT", "PATCH"):
             body = environ["wsgi.input"].read(content_length)
@@ -209,6 +250,8 @@ class VibeShieldWSGIMiddleware:
                 try:
                     data = json.loads(body.decode("utf-8"))
                     sanitized_data = sanitize(data)
+                    if is_crypto_active:
+                        sanitized_data = process_crypto_fields(sanitized_data, self.crypto_fields, True, self.crypto_secret)
                     sanitized_body = json.dumps(sanitized_data).encode("utf-8")
                 except Exception:
                     sanitized_body = sanitize(body.decode("utf-8", errors="ignore")).encode("utf-8")
@@ -233,7 +276,9 @@ class VibeShieldWSGIMiddleware:
         def custom_start_response(status, response_headers, exc_info=None):
             captured_status[0] = status
             captured_headers[0] = response_headers
-            return start_response(status, response_headers, exc_info)
+            if not is_crypto_active:
+                return start_response(status, response_headers, exc_info)
+            return lambda body: None
 
         try:
             response_iterable = self.app(environ, custom_start_response)
@@ -242,6 +287,27 @@ class VibeShieldWSGIMiddleware:
                 body_chunks.append(chunk)
             
             full_body = b"".join(body_chunks)
+
+            # 5. Response Decryption
+            if is_crypto_active:
+                content_type = next((v for k, v in captured_headers[0] if k.lower() == "content-type"), "")
+                if "application/json" in content_type:
+                    try:
+                        res_data = json.loads(full_body.decode("utf-8"))
+                        decrypted_data = process_crypto_fields(res_data, self.crypto_fields, False, self.crypto_secret)
+                        full_body = json.dumps(decrypted_data).encode("utf-8")
+                        new_headers = []
+                        for k, v in captured_headers[0]:
+                            if k.lower() == "content-length":
+                                new_headers.append((k, str(len(full_body))))
+                            else:
+                                new_headers.append((k, v))
+                        captured_headers[0] = new_headers
+                    except Exception:
+                        pass
+                
+                # Forward delayed headers
+                start_response(captured_status[0], captured_headers[0])
 
             # Cache the response on successful GET
             if self.cache_enabled and method == "GET" and captured_status[0] and captured_status[0].startswith("200") and cache_key:
