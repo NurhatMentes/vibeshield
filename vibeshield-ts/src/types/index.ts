@@ -97,6 +97,29 @@ export interface LoggingOptions {
   performanceThresholdMs?: number;
 }
 
+export interface BudgetOptions {
+  /**
+   * Enable the VibeBudgeter shield for external requests.
+   * @default false
+   */
+  enabled: boolean;
+
+  /**
+   * Maximum allowed external API calls per UTC day.
+   */
+  maxDailyRequests?: number;
+
+  /**
+   * Estimated dollar cost per LLM token.
+   */
+  estimatedCostPerToken?: number;
+
+  /**
+   * Maximum estimated dollar amount allowed per UTC day.
+   */
+  dailyDollarLimit?: number;
+}
+
 export interface VibeShieldOptions {
   security?: SecurityOptions;
   crypto?: CryptoOptions;
@@ -104,4 +127,5 @@ export interface VibeShieldOptions {
   errors?: ErrorOptions;
   validationSchema?: ValidationSchema;
   logging?: LoggingOptions;
+  budget?: BudgetOptions;
 }

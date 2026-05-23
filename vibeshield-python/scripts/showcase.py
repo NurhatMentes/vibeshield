@@ -4,6 +4,8 @@ import json
 import httpx
 from fastapi import FastAPI, Request
 from src.core import VibeShieldASGIMiddleware
+from src.budget import global_budget_tracker
+from src.fetch import vibe_fetch
 
 # ==========================================
 # 1. MOCK HANDLERS FOR SECURITY SHOWCASE
@@ -267,11 +269,52 @@ async def run_performance_benchmark():
     print(f"Database Load Relieved: {(((queries_no_cache - queries_cache) / queries_no_cache) * 100):.2f}% fewer queries")
     print('=============================================================\n')
 
+# ==========================================
+# 5. VIBEBUDGETER FINANCIAL SHIELD SHOWCASE
+# ==========================================
+async def run_budget_showcase():
+    print('=============================================================')
+    print('💸 VIBESHIELD VIBEBUDGETER (FINANCIAL SHIELD) SHOWCASE')
+    print('=============================================================\n')
+
+    # Reset state for clean showcase
+    global_budget_tracker.reset_for_test()
+
+    # We will simulate the request hitting an arbitrary endpoint using vibe_fetch.
+    # To avoid actually pinging a real endpoint 10 times in a test script, 
+    # we'll ping a fast public mock endpoint or localhost. We'll use localhost.
+    
+    budget_options = {
+        "budget": {
+            "enabled": True,
+            "maxDailyRequests": 5
+        }
+    }
+
+    print('Simulating a rapid loop of 10 external AI API calls...')
+    print('VibeBudgeter Limit: 5 requests max\n')
+
+    successful_calls = 0
+    blocked_calls = 0
+
+    for i in range(1, 11):
+        try:
+            # Pinging localhost just to trigger the fetch (doesn't matter if it 404s, budget tracks the outgoing attempt)
+            await vibe_fetch("http://localhost", options=budget_options)
+            successful_calls += 1
+            print(f"[Call {i}] ✅ Success (Under Budget)")
+        except Exception as e:
+            blocked_calls += 1
+            print(f"[Call {i}] ❌ Blocked: {str(e)}")
+
+    print(f"\nSummary: {successful_calls} calls succeeded, {blocked_calls} calls blocked.\n")
+
 async def main():
     await run_security_showcase()
     await run_crypto_showcase()
     await run_validation_logging_showcase()
     await run_performance_benchmark()
+    await run_budget_showcase()
 
 if __name__ == "__main__":
     asyncio.run(main())

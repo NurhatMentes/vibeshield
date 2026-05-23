@@ -1,4 +1,5 @@
-import { vibeShield } from '../src/index.js';
+import { vibeShield, vibeFetch } from '../src/index.js';
+import { globalBudgetTracker } from '../src/core/budget.js';
 import { performance } from 'perf_hooks';
 
 // ==========================================
@@ -292,12 +293,61 @@ async function runPerformanceBenchmark() {
   console.log('=============================================================\n');
 }
 
+// ==========================================
+// 5. VIBEBUDGETER FINANCIAL SHIELD SHOWCASE
+// ==========================================
+async function runVibeBudgeterShowcase() {
+  console.log('=============================================================');
+  console.log('💸 VIBESHIELD VIBEBUDGETER (FINANCIAL SHIELD) SHOWCASE');
+  console.log('=============================================================\n');
+
+  // Reset the global state to ensure clean showcase
+  globalBudgetTracker.resetForTest();
+
+  // Mock global.fetch just for the showcase simulation
+  const originalFetch = global.fetch;
+  global.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    return new Response(JSON.stringify({ mock: 'data' }));
+  };
+
+  const budgetOptions = {
+    budget: {
+      enabled: true,
+      maxDailyRequests: 5 // Hard cutoff at 5 external API calls
+    }
+  };
+
+  console.log('Simulating a rapid loop of 10 external AI API calls...');
+  console.log('VibeBudgeter Limit: 5 requests max\n');
+
+  let successfulCalls = 0;
+  let blockedCalls = 0;
+
+  for (let i = 1; i <= 10; i++) {
+    try {
+      await vibeFetch('https://api.openai.com/v1/chat', undefined, budgetOptions);
+      successfulCalls++;
+      console.log(`[Call ${i}] ✅ Success (Under Budget)`);
+    } catch (e: any) {
+      blockedCalls++;
+      console.log(`[Call ${i}] ❌ Blocked: ${e.message}`);
+    }
+  }
+
+  console.log(`\nSummary: ${successfulCalls} calls succeeded, ${blockedCalls} calls blocked.`);
+  
+  // Restore original fetch
+  global.fetch = originalFetch;
+  console.log();
+}
+
 // Run the suite
 async function main() {
   await runSecurityShowcase();
   await runCryptoShowcase();
   await runValidationLoggingShowcase();
   await runPerformanceBenchmark();
+  await runVibeBudgeterShowcase();
 }
 
 main().catch(console.error);

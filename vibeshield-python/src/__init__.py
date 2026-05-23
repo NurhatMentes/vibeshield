@@ -2,6 +2,7 @@ from .core import VibeShieldASGIMiddleware, VibeShieldWSGIMiddleware, global_cac
 from .sanitizer import sanitize
 from .cache import VibeShieldCache, CachedResponse
 from .errors import handle_exception
+from .fetch import vibe_fetch
 
 __all__ = [
     "VibeShieldASGIMiddleware",
@@ -11,4 +12,5 @@ __all__ = [
     "VibeShieldCache",
     "CachedResponse",
     "handle_exception",
+    "vibe_fetch",
 ]
