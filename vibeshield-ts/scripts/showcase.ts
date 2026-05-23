@@ -139,8 +139,33 @@ async function slowHandler(req: Request): Promise<Response> {
 
 const validationProtectedHandler = vibeShield(slowHandler, {
   validationSchema: {
-    email: { type: 'string', required: true, format: 'email' },
-    age: { type: 'number', min: 18 }
+    user: {
+      type: 'object',
+      required: true,
+      schema: {
+        profile: {
+          type: 'object',
+          required: true,
+          schema: {
+            email: { type: 'string', required: true, format: 'email' }
+          }
+        }
+      }
+    },
+    cart: {
+      type: 'object',
+      schema: {
+        items: {
+          type: 'array',
+          elementSchema: {
+            type: 'object',
+            schema: {
+              quantity: { type: 'number', min: 1 }
+            }
+          }
+        }
+      }
+    }
   },
   logging: {
     audit: true,
@@ -153,8 +178,11 @@ async function runValidationLoggingShowcase() {
   console.log('✅ VIBESHIELD VALIDATION & ⏱️ AUDIT LOGGING SHOWCASE');
   console.log('=============================================================\n');
 
-  console.log('--- CASE A: VALIDATION REJECTION (400 BAD REQUEST) ---');
-  const invalidBody = { email: "not-an-email", age: 15 };
+  console.log('--- CASE A: DEEP VALIDATION REJECTION (400 BAD REQUEST) ---');
+  const invalidBody = {
+    user: { profile: { email: "not-an-email" } },
+    cart: { items: [{ quantity: 0 }] }
+  };
   const invalidReq = () => new Request('http://localhost/register', {
     method: 'POST', body: JSON.stringify(invalidBody), headers: { 'Content-Type': 'application/json' }
   });
@@ -165,7 +193,10 @@ async function runValidationLoggingShowcase() {
   console.log();
 
   console.log('--- CASE B: SLOW ROUTE EXECUTION (PERFORMANCE WARNING) ---');
-  const validBody = { email: "user@example.com", age: 25 };
+  const validBody = {
+    user: { profile: { email: "user@example.com" } },
+    cart: { items: [{ quantity: 2 }] }
+  };
   const validReq = () => new Request('http://localhost/register', {
     method: 'POST', body: JSON.stringify(validBody), headers: { 'Content-Type': 'application/json' }
   });

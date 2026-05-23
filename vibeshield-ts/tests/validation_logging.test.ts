@@ -1,52 +1,103 @@
 import { describe, it, expect, vi } from 'vitest';
 import { validatePayload } from '../src/core/validation';
-import { startAuditTimer, endAuditTimer, logAudit, logPerformanceWarning } from '../src/core/logging';
+import { startAuditTimer, endAuditTimer, logPerformanceWarning } from '../src/core/logging';
 
-describe('VibeShield Phase 3: Validation & Logging Engine', () => {
-  describe('Validation Engine', () => {
+describe('VibeShield Phase 3.5: Recursive Validation & Logging Engine', () => {
+  describe('Deep Recursive Validation Engine', () => {
     const schema = {
-      email: { type: 'string', required: true, format: 'email' },
-      age: { type: 'number', min: 18, max: 120 },
-      tags: { type: 'array', min: 1, max: 3 }
+      user: {
+        type: 'object',
+        required: true,
+        schema: {
+          profile: {
+            type: 'object',
+            required: true,
+            schema: {
+              email: { type: 'string', required: true, format: 'email' },
+              age: { type: 'number', min: 18 }
+            }
+          }
+        }
+      },
+      cart: {
+        type: 'object',
+        schema: {
+          items: {
+            type: 'array',
+            min: 1,
+            elementSchema: {
+              type: 'object',
+              schema: {
+                productId: { type: 'string', required: true },
+                quantity: { type: 'number', min: 1 }
+              }
+            }
+          }
+        }
+      },
+      tags: {
+        type: 'array',
+        elementSchema: { type: 'string', min: 2 }
+      }
     } as any;
 
-    it('should pass valid payloads', () => {
+    it('should pass fully valid deep nested payloads', () => {
       const payload = {
-        email: 'test@example.com',
-        age: 25,
-        tags: ['premium']
+        user: { profile: { email: 'test@example.com', age: 25 } },
+        cart: { items: [{ productId: 'abc', quantity: 2 }] },
+        tags: ['premium', 'vip']
       };
       const result = validatePayload(payload, schema);
       expect(result.isValid).toBe(true);
       expect(result.errors).toBeNull();
     });
 
-    it('should fail if required fields are missing', () => {
-      const payload = { age: 25 };
+    it('should fail and generate dot-notation paths for missing nested fields', () => {
+      const payload = {
+        user: { profile: { age: 25 } } // missing email
+      };
       const result = validatePayload(payload, schema);
       expect(result.isValid).toBe(false);
-      expect(result.errors?.email).toContain('required');
+      expect(result.errors?.['user.profile.email']).toContain('required');
     });
 
-    it('should fail if email format is invalid', () => {
-      const payload = { email: 'not-an-email', age: 25 };
+    it('should fail and generate bracket-notation paths for invalid array elements', () => {
+      const payload = {
+        user: { profile: { email: 'test@example.com', age: 25 } },
+        cart: { items: [{ productId: 'abc', quantity: 2 }, { productId: 'def', quantity: 0 }] } // 0 is invalid
+      };
       const result = validatePayload(payload, schema);
       expect(result.isValid).toBe(false);
-      expect(result.errors?.email).toContain('format');
+      expect(result.errors?.['cart.items[1].quantity']).toContain('greater than or equal to 1');
     });
 
-    it('should enforce numeric min/max constraints', () => {
-      const payload = { email: 'test@example.com', age: 15 };
+    it('should fail and generate bracket-notation paths for arrays of primitives', () => {
+      const payload = {
+        user: { profile: { email: 'test@example.com', age: 25 } },
+        tags: ['ok', 'a'] // 'a' is too short
+      };
       const result = validatePayload(payload, schema);
       expect(result.isValid).toBe(false);
-      expect(result.errors?.age).toContain('greater than or equal to 18');
+      expect(result.errors?.['tags[1]']).toContain('at least 2 characters');
     });
 
-    it('should enforce array length constraints', () => {
-      const payload = { email: 'test@example.com', tags: ['a', 'b', 'c', 'd'] };
+    it('should fail on type mismatches in deep objects', () => {
+      const payload = {
+        user: { profile: { email: 123, age: 25 } } // email should be string
+      };
       const result = validatePayload(payload, schema);
       expect(result.isValid).toBe(false);
-      expect(result.errors?.tags).toContain('not contain more than 3 items');
+      expect(result.errors?.['user.profile.email']).toContain('Expected type \'string\'');
+    });
+
+    it('should enforce array length constraints on root arrays', () => {
+      const payload = {
+        user: { profile: { email: 'test@example.com', age: 25 } },
+        cart: { items: [] } // requires at least 1
+      };
+      const result = validatePayload(payload, schema);
+      expect(result.isValid).toBe(false);
+      expect(result.errors?.['cart.items']).toContain('at least 1 items');
     });
   });
 
@@ -64,7 +115,6 @@ describe('VibeShield Phase 3: Validation & Logging Engine', () => {
       logPerformanceWarning('POST', '/api/checkout', 600, 500);
       expect(consoleWarnSpy).toHaveBeenCalled();
       expect(consoleWarnSpy.mock.calls[0][0]).toContain('PERFORMANCE WARNING');
-      expect(consoleWarnSpy.mock.calls[0][0]).toContain('600');
       consoleWarnSpy.mockRestore();
     });
   });

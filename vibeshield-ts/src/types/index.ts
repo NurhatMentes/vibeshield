@@ -77,6 +77,8 @@ export interface ValidationRule {
   min?: number;
   max?: number;
   format?: 'email';
+  schema?: Record<string, ValidationRule>; // For nested objects
+  elementSchema?: ValidationRule;          // For arrays containing objects or specific types
 }
 
 export type ValidationSchema = Record<string, ValidationRule>;

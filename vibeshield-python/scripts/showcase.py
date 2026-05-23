@@ -119,8 +119,33 @@ async def run_validation_logging_showcase():
     validation_app.add_middleware(
         VibeShieldASGIMiddleware, 
         validation_schema={
-            "email": {"type": "string", "required": True, "format": "email"},
-            "age": {"type": "number", "min": 18}
+            "user": {
+                "type": "object",
+                "required": True,
+                "schema": {
+                    "profile": {
+                        "type": "object",
+                        "required": True,
+                        "schema": {
+                            "email": {"type": "string", "required": True, "format": "email"}
+                        }
+                    }
+                }
+            },
+            "cart": {
+                "type": "object",
+                "schema": {
+                    "items": {
+                        "type": "array",
+                        "elementSchema": {
+                            "type": "object",
+                            "schema": {
+                                "quantity": {"type": "number", "min": 1}
+                            }
+                        }
+                    }
+                }
+            }
         },
         logging={
             "audit": True,
@@ -135,8 +160,11 @@ async def run_validation_logging_showcase():
         return {"status": "success", "data": body}
 
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=validation_app), base_url="http://localhost") as client:
-        print('--- CASE A: VALIDATION REJECTION (400 BAD REQUEST) ---')
-        invalid_body = {"email": "not-an-email", "age": 15}
+        print('--- CASE A: DEEP VALIDATION REJECTION (400 BAD REQUEST) ---')
+        invalid_body = {
+            "user": {"profile": {"email": "not-an-email"}},
+            "cart": {"items": [{"quantity": 0}]}
+        }
         print('Client Payload Sent:', json.dumps(invalid_body))
         
         res_invalid = await client.post("/register", json=invalid_body)
@@ -144,7 +172,10 @@ async def run_validation_logging_showcase():
         print()
 
         print('--- CASE B: SLOW ROUTE EXECUTION (PERFORMANCE WARNING) ---')
-        valid_body = {"email": "user@example.com", "age": 25}
+        valid_body = {
+            "user": {"profile": {"email": "user@example.com"}},
+            "cart": {"items": [{"quantity": 2}]}
+        }
         print('Client Payload Sent:', json.dumps(valid_body))
         print('(Simulating 600ms delay... watch for the warning)')
         
