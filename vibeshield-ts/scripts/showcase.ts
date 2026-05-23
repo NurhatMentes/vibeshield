@@ -126,7 +126,59 @@ async function runCryptoShowcase() {
 }
 
 // ==========================================
-// 3. MOCK HANDLERS FOR PERFORMANCE BENCHMARK
+// 3. MOCK HANDLERS FOR VALIDATION & LOGGING
+// ==========================================
+
+async function slowHandler(req: Request): Promise<Response> {
+  const body = await req.json();
+  await new Promise(resolve => setTimeout(resolve, 600)); // 600ms delay
+  return new Response(JSON.stringify({ status: 'success', data: body }), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+const validationProtectedHandler = vibeShield(slowHandler, {
+  validationSchema: {
+    email: { type: 'string', required: true, format: 'email' },
+    age: { type: 'number', min: 18 }
+  },
+  logging: {
+    audit: true,
+    performanceThresholdMs: 500
+  }
+});
+
+async function runValidationLoggingShowcase() {
+  console.log('=============================================================');
+  console.log('✅ VIBESHIELD VALIDATION & ⏱️ AUDIT LOGGING SHOWCASE');
+  console.log('=============================================================\n');
+
+  console.log('--- CASE A: VALIDATION REJECTION (400 BAD REQUEST) ---');
+  const invalidBody = { email: "not-an-email", age: 15 };
+  const invalidReq = () => new Request('http://localhost/register', {
+    method: 'POST', body: JSON.stringify(invalidBody), headers: { 'Content-Type': 'application/json' }
+  });
+
+  console.log('Client Payload Sent:', JSON.stringify(invalidBody));
+  const invalidRes = await validationProtectedHandler(invalidReq());
+  console.log('Response Received:', await invalidRes.text());
+  console.log();
+
+  console.log('--- CASE B: SLOW ROUTE EXECUTION (PERFORMANCE WARNING) ---');
+  const validBody = { email: "user@example.com", age: 25 };
+  const validReq = () => new Request('http://localhost/register', {
+    method: 'POST', body: JSON.stringify(validBody), headers: { 'Content-Type': 'application/json' }
+  });
+  
+  console.log('Client Payload Sent:', JSON.stringify(validBody));
+  console.log('(Simulating 600ms delay... watch for the warning)');
+  const validRes = await validationProtectedHandler(validReq());
+  console.log('Response Received:', await validRes.text());
+  console.log();
+}
+
+// ==========================================
+// 4. MOCK HANDLERS FOR PERFORMANCE BENCHMARK
 // ==========================================
 
 let dbQueryCount = 0;
@@ -213,6 +265,7 @@ async function runPerformanceBenchmark() {
 async function main() {
   await runSecurityShowcase();
   await runCryptoShowcase();
+  await runValidationLoggingShowcase();
   await runPerformanceBenchmark();
 }
 

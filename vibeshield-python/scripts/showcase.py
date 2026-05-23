@@ -107,7 +107,53 @@ async def run_crypto_showcase():
         print()
 
 # ==========================================
-# 3. PERFORMANCE BENCHMARK
+# 3. VALIDATION & LOGGING SHOWCASE
+# ==========================================
+
+async def run_validation_logging_showcase():
+    print('=============================================================')
+    print('✅ VIBESHIELD VALIDATION & ⏱️ AUDIT LOGGING SHOWCASE')
+    print('=============================================================\n')
+
+    validation_app = FastAPI()
+    validation_app.add_middleware(
+        VibeShieldASGIMiddleware, 
+        validation_schema={
+            "email": {"type": "string", "required": True, "format": "email"},
+            "age": {"type": "number", "min": 18}
+        },
+        logging={
+            "audit": True,
+            "performance_threshold_ms": 500
+        }
+    )
+
+    @validation_app.post("/register")
+    async def register_protected(request: Request):
+        body = await request.json()
+        await asyncio.sleep(0.6) # Simulating 600ms slow query
+        return {"status": "success", "data": body}
+
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=validation_app), base_url="http://localhost") as client:
+        print('--- CASE A: VALIDATION REJECTION (400 BAD REQUEST) ---')
+        invalid_body = {"email": "not-an-email", "age": 15}
+        print('Client Payload Sent:', json.dumps(invalid_body))
+        
+        res_invalid = await client.post("/register", json=invalid_body)
+        print('Response Received:', res_invalid.text)
+        print()
+
+        print('--- CASE B: SLOW ROUTE EXECUTION (PERFORMANCE WARNING) ---')
+        valid_body = {"email": "user@example.com", "age": 25}
+        print('Client Payload Sent:', json.dumps(valid_body))
+        print('(Simulating 600ms delay... watch for the warning)')
+        
+        res_valid = await client.post("/register", json=valid_body)
+        print('Response Received:', res_valid.text)
+        print()
+
+# ==========================================
+# 4. PERFORMANCE BENCHMARK
 # ==========================================
 
 db_query_count = 0
@@ -193,6 +239,7 @@ async def run_performance_benchmark():
 async def main():
     await run_security_showcase()
     await run_crypto_showcase()
+    await run_validation_logging_showcase()
     await run_performance_benchmark()
 
 if __name__ == "__main__":

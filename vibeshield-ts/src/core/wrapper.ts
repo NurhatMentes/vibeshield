@@ -3,6 +3,8 @@ import { sanitize, sanitizeString, sanitizeUrl } from './sanitizer.js';
 import { globalCache } from './cache.js';
 import { handleError } from './errorHandler.js';
 import { processCryptoFields } from './security/crypto.js';
+import { validatePayload } from './validation.js';
+import { startAuditTimer, endAuditTimer, logAudit, logPerformanceWarning } from './logging.js';
 
 /**
  * Creates a sanitized ES6 Proxy wrapper over the original Request object.
@@ -128,6 +130,11 @@ export function vibeShield(
   options?: VibeShieldOptions
 ): (req: Request, context?: any) => Promise<Response> {
   return async (req: Request, context?: any): Promise<Response> => {
+    let auditStartTime: bigint | undefined;
+    if (options?.logging) {
+      auditStartTime = startAuditTimer();
+    }
+
     const cacheEnabled = options?.cache?.enabled === true;
     const isGet = req.method.toUpperCase() === 'GET';
     let cacheKey = '';
@@ -171,6 +178,24 @@ export function vibeShield(
       // 3. Request Interception using Proxy
       const sanitizedReq = createSanitizedRequest(req, options);
 
+      // 3b. Validation Engine Interception
+      if (options?.validationSchema && ['POST', 'PUT', 'PATCH'].includes(req.method.toUpperCase())) {
+        try {
+          const body = await sanitizedReq.json();
+          const validation = validatePayload(body, options.validationSchema);
+          if (!validation.isValid) {
+            const badReqResponse = Response.json({ status: 'error', errors: validation.errors }, { status: 400 });
+            if (options?.logging && auditStartTime !== undefined) {
+              const durationMs = endAuditTimer(auditStartTime);
+              if (options.logging.audit) logAudit(req.method, new URL(req.url).pathname, badReqResponse.status, durationMs);
+            }
+            return badReqResponse;
+          }
+        } catch (e) {
+          // Ignore JSON parse errors here; handler might handle it or it's empty
+        }
+      }
+
       // 4. Handler Execution
       let response = await handler(sanitizedReq, sanitizedContext);
 
@@ -198,10 +223,32 @@ export function vibeShield(
         globalCache.set(cacheKey, response, options?.cache?.ttl).catch(() => {});
       }
 
+      if (options?.logging && auditStartTime !== undefined) {
+        const durationMs = endAuditTimer(auditStartTime);
+        if (options.logging.audit) {
+          logAudit(req.method, new URL(req.url).pathname, response.status, durationMs);
+        }
+        if (options.logging.performanceThresholdMs && durationMs > options.logging.performanceThresholdMs) {
+          logPerformanceWarning(req.method, new URL(req.url).pathname, durationMs, options.logging.performanceThresholdMs);
+        }
+      }
+
       return response;
     } catch (error) {
       // 6. Global Exception Middleware Mapping
-      return handleError(error, options?.errors);
+      const errResponse = handleError(error, options?.errors);
+      
+      if (options?.logging && auditStartTime !== undefined) {
+        const durationMs = endAuditTimer(auditStartTime);
+        if (options.logging.audit) {
+          logAudit(req.method, new URL(req.url).pathname, errResponse.status, durationMs);
+        }
+        if (options.logging.performanceThresholdMs && durationMs > options.logging.performanceThresholdMs) {
+          logPerformanceWarning(req.method, new URL(req.url).pathname, durationMs, options.logging.performanceThresholdMs);
+        }
+      }
+      
+      return errResponse;
     }
   };
 }

@@ -7,6 +7,8 @@ from .sanitizer import sanitize
 from .cache import VibeShieldCache, CachedResponse
 from .errors import handle_exception
 from .security.crypto import process_crypto_fields
+from .validation import validate_payload
+from .logging import start_audit_timer, end_audit_timer, log_audit, log_performance_warning
 
 # Global cache instance
 global_cache = VibeShieldCache()
@@ -16,19 +18,22 @@ class VibeShieldASGIMiddleware:
     ASGI Middleware for FastAPI / Starlette.
     Provides plug-and-play sanitization, error masking, caching, and transparent field encryption.
     """
-    def __init__(self, app, cache_enabled: bool = False, cache_ttl: float = 60.0, key_generator = None, crypto_secret: str = None, crypto_fields: list = None):
+    def __init__(self, app, cache_enabled: bool = False, cache_ttl: float = 60.0, key_generator = None, crypto_secret: str = None, crypto_fields: list = None, validation_schema: dict = None, logging: dict = None):
         self.app = app
         self.cache_enabled = cache_enabled
         self.cache_ttl = cache_ttl
         self.key_generator = key_generator
         self.crypto_secret = crypto_secret
         self.crypto_fields = crypto_fields or []
+        self.validation_schema = validation_schema
+        self.logging = logging
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
 
+        audit_start_time = start_audit_timer() if self.logging else None
         is_crypto_active = bool(self.crypto_secret and self.crypto_fields)
 
         # 1. Sanitize Query Parameters on-the-fly
@@ -59,6 +64,9 @@ class VibeShieldASGIMiddleware:
 
             cached = global_cache.get(cache_key)
             if cached:
+                if self.logging and audit_start_time is not None:
+                    duration_ms = end_audit_timer(audit_start_time)
+                    if self.logging.get("audit"): log_audit(method, path, cached.status, duration_ms)
                 # Cache hit - send response directly
                 await send({
                     "type": "http.response.start",
@@ -91,6 +99,24 @@ class VibeShieldASGIMiddleware:
                 if "application/json" in content_type:
                     try:
                         data = json.loads(body.decode("utf-8"))
+                        if self.validation_schema:
+                            is_valid, errors = validate_payload(data, self.validation_schema)
+                            if not is_valid:
+                                error_body = json.dumps({"status": "error", "errors": errors}).encode("utf-8")
+                                if self.logging and audit_start_time is not None:
+                                    duration_ms = end_audit_timer(audit_start_time)
+                                    if self.logging.get("audit"): log_audit(method, path, 400, duration_ms)
+                                await send({
+                                    "type": "http.response.start",
+                                    "status": 400,
+                                    "headers": [(b"content-type", b"application/json"), (b"content-length", str(len(error_body)).encode("utf-8"))]
+                                })
+                                await send({
+                                    "type": "http.response.body",
+                                    "body": error_body,
+                                    "more_body": False
+                                })
+                                return
                         sanitized_data = sanitize(data)
                         if is_crypto_active:
                             sanitized_data = process_crypto_fields(sanitized_data, self.crypto_fields, True, self.crypto_secret)
@@ -178,10 +204,24 @@ class VibeShieldASGIMiddleware:
             # Cache the response on successful GET
             if self.cache_enabled and method == "GET" and status_code[0] == 200 and cache_key:
                 global_cache.set(cache_key, CachedResponse(status_code[0], response_headers[0], full_body), self.cache_ttl)
+
+            if self.logging and audit_start_time is not None:
+                duration_ms = end_audit_timer(audit_start_time)
+                if self.logging.get("audit"): log_audit(method, path, status_code[0], duration_ms)
+                threshold = self.logging.get("performance_threshold_ms")
+                if threshold and duration_ms > threshold:
+                    log_performance_warning(method, path, duration_ms, threshold)
                 
         except Exception as e:
             masked_payload, tracking_id = handle_exception(e)
             error_body = json.dumps(masked_payload).encode("utf-8")
+            
+            if self.logging and audit_start_time is not None:
+                duration_ms = end_audit_timer(audit_start_time)
+                if self.logging.get("audit"): log_audit(method, path, 500, duration_ms)
+                threshold = self.logging.get("performance_threshold_ms")
+                if threshold and duration_ms > threshold:
+                    log_performance_warning(method, path, duration_ms, threshold)
             
             if not is_crypto_active or not response_headers[0]: # Ensure start hasn't been sent if active
                 await send({
@@ -201,15 +241,18 @@ class VibeShieldWSGIMiddleware:
     WSGI Middleware for Flask.
     Provides plug-and-play sanitization, error masking, caching, and transparent field encryption.
     """
-    def __init__(self, app, cache_enabled: bool = False, cache_ttl: float = 60.0, key_generator = None, crypto_secret: str = None, crypto_fields: list = None):
+    def __init__(self, app, cache_enabled: bool = False, cache_ttl: float = 60.0, key_generator = None, crypto_secret: str = None, crypto_fields: list = None, validation_schema: dict = None, logging: dict = None):
         self.app = app
         self.cache_enabled = cache_enabled
         self.cache_ttl = cache_ttl
         self.key_generator = key_generator
         self.crypto_secret = crypto_secret
         self.crypto_fields = crypto_fields or []
+        self.validation_schema = validation_schema
+        self.logging = logging
 
     def __call__(self, environ, start_response):
+        audit_start_time = start_audit_timer() if self.logging else None
         is_crypto_active = bool(self.crypto_secret and self.crypto_fields)
 
         # 1. Sanitize Query Parameters on-the-fly
@@ -236,6 +279,9 @@ class VibeShieldWSGIMiddleware:
 
             cached = global_cache.get(cache_key)
             if cached:
+                if self.logging and audit_start_time is not None:
+                    duration_ms = end_audit_timer(audit_start_time)
+                    if self.logging.get("audit"): log_audit(method, path, cached.status, duration_ms)
                 start_response(f"{cached.status} OK", cached.headers)
                 return [cached.body]
 
@@ -249,6 +295,15 @@ class VibeShieldWSGIMiddleware:
             if "application/json" in content_type:
                 try:
                     data = json.loads(body.decode("utf-8"))
+                    if self.validation_schema:
+                        is_valid, errors = validate_payload(data, self.validation_schema)
+                        if not is_valid:
+                            error_body = json.dumps({"status": "error", "errors": errors}).encode("utf-8")
+                            if self.logging and audit_start_time is not None:
+                                duration_ms = end_audit_timer(audit_start_time)
+                                if self.logging.get("audit"): log_audit(method, path, 400, duration_ms)
+                            start_response("400 Bad Request", [("Content-Type", "application/json"), ("Content-Length", str(len(error_body)))])
+                            return [error_body]
                     sanitized_data = sanitize(data)
                     if is_crypto_active:
                         sanitized_data = process_crypto_fields(sanitized_data, self.crypto_fields, True, self.crypto_secret)
@@ -317,10 +372,29 @@ class VibeShieldWSGIMiddleware:
                     status_code = 200
                 global_cache.set(cache_key, CachedResponse(status_code, captured_headers[0], full_body), self.cache_ttl)
 
+            if self.logging and audit_start_time is not None:
+                duration_ms = end_audit_timer(audit_start_time)
+                try:
+                    final_status = int(captured_status[0].split()[0])
+                except Exception:
+                    final_status = 200
+                if self.logging.get("audit"): log_audit(method, path, final_status, duration_ms)
+                threshold = self.logging.get("performance_threshold_ms")
+                if threshold and duration_ms > threshold:
+                    log_performance_warning(method, path, duration_ms, threshold)
+
             return [full_body]
 
         except Exception as e:
             masked_payload, tracking_id = handle_exception(e)
             error_body = json.dumps(masked_payload).encode("utf-8")
+            
+            if self.logging and audit_start_time is not None:
+                duration_ms = end_audit_timer(audit_start_time)
+                if self.logging.get("audit"): log_audit(method, path, 500, duration_ms)
+                threshold = self.logging.get("performance_threshold_ms")
+                if threshold and duration_ms > threshold:
+                    log_performance_warning(method, path, duration_ms, threshold)
+                    
             start_response("500 Internal Server Error", [("Content-Type", "application/json")])
             return [error_body]

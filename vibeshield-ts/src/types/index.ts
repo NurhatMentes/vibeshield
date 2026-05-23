@@ -69,9 +69,37 @@ export interface CryptoOptions {
   encryptFields?: string[];
 }
 
+export type ValidatorType = 'string' | 'number' | 'boolean' | 'object' | 'array';
+
+export interface ValidationRule {
+  type: ValidatorType;
+  required?: boolean;
+  min?: number;
+  max?: number;
+  format?: 'email';
+}
+
+export type ValidationSchema = Record<string, ValidationRule>;
+
+export interface LoggingOptions {
+  /**
+   * Log every request and its precise duration to the console.
+   * @default false
+   */
+  audit?: boolean;
+
+  /**
+   * Threshold in milliseconds. If execution time exceeds this, a VIBESHIELD PERFORMANCE WARNING is logged.
+   * @default undefined
+   */
+  performanceThresholdMs?: number;
+}
+
 export interface VibeShieldOptions {
   security?: SecurityOptions;
   crypto?: CryptoOptions;
   cache?: CacheOptions;
   errors?: ErrorOptions;
+  validationSchema?: ValidationSchema;
+  logging?: LoggingOptions;
 }
