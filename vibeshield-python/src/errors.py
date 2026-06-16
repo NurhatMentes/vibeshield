@@ -3,6 +3,8 @@ import string
 import logging
 import traceback
 
+from .stack_sanitizer import sanitize_traceback
+
 # Setup default logger
 logger = logging.getLogger("VibeShield")
 if not logger.handlers:
@@ -21,13 +23,15 @@ def generate_tracking_id() -> str:
 
 def handle_exception(e: Exception) -> tuple[dict, str]:
     """
-    Logs the exception stack trace and returns a safe client response payload with a tracking ID.
+    Logs the sanitized exception stack trace and returns a safe client response payload
+    with a tracking ID. Sensitive file paths, IP addresses, and database info are redacted
+    from the server-side log output.
     """
     tracking_id = generate_tracking_id()
     
-    # Extract and format traceback
-    tb_str = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-    logger.error(f"[{tracking_id}] Unhandled Exception Captured:\n{tb_str}")
+    # Sanitize the traceback before logging
+    sanitized_tb = sanitize_traceback(e)
+    logger.error(f"[{tracking_id}] Unhandled Exception Captured:\n{sanitized_tb}")
     
     masked_payload = {
         "success": False,
