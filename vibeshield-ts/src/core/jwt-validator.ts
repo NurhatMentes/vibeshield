@@ -63,59 +63,28 @@ const MIN_SECRET_LENGTH = 10;
 const RECOMMENDED_SECRET_LENGTH = 32;
 
 /**
- * Checks whether a string consists of a single repeating character (e.g., "aaaaaa", "111111").
- */
-function isRepeatingChars(s: string): boolean {
-  if (s.length === 0) return false;
-  const first = s[0];
-  for (let i = 1; i < s.length; i++) {
-    if (s[i] !== first) return false;
-  }
-  return true;
-}
-
-/**
- * Checks whether a string is a short repeating pattern (e.g., "abcabc", "ababab").
- */
-function isRepeatingPattern(s: string): boolean {
-  const len = s.length;
-  if (len < 4) return false;
-  // Check pattern lengths from 1 up to half the string length
-  for (let patLen = 1; patLen <= Math.floor(len / 2); patLen++) {
-    if (len % patLen !== 0) continue;
-    const pattern = s.substring(0, patLen);
-    let match = true;
-    for (let i = patLen; i < len; i += patLen) {
-      if (s.substring(i, i + patLen) !== pattern) {
-        match = false;
-        break;
-      }
-    }
-    if (match) return true;
-  }
-  return false;
-}
-
-/**
  * Calculates Shannon entropy (bits per character) for a given string.
  * Higher entropy indicates more randomness/complexity.
  */
-function calculateEntropy(s: string): number {
-  if (s.length === 0) return 0;
-  const freq: Record<string, number> = {};
-  for (const ch of s) {
-    freq[ch] = (freq[ch] || 0) + 1;
+function calculateShannonEntropy(secret: string): number {
+  if (!secret) return 0;
+  
+  const frequencyMap = new Map<string, number>();
+  for (const char of secret) {
+    frequencyMap.set(char, (frequencyMap.get(char) || 0) + 1);
   }
+  
   let entropy = 0;
-  const len = s.length;
-  for (const count of Object.values(freq)) {
-    const p = count / len;
-    if (p > 0) {
-      entropy -= p * Math.log2(p);
-    }
+  const len = secret.length;
+  
+  for (const count of frequencyMap.values()) {
+    const probability = count / len;
+    entropy -= probability * Math.log2(probability);
   }
+  
   return entropy;
 }
+
 
 /**
  * Validates a JWT secret key for common security vulnerabilities.
@@ -146,6 +115,8 @@ export function validateJwtSecret(secret: string | undefined): JwtValidationResu
     return { valid: false, errors, warnings };
   }
 
+  const withoutPadding = trimmed.replace(/=+$/, '');
+
   // ── 2. Hardcoded Pattern Detection ──────────────────────────────────
   const lower = trimmed.toLowerCase();
   for (const pattern of HARDCODED_PATTERNS) {
@@ -162,11 +133,29 @@ export function validateJwtSecret(secret: string | undefined): JwtValidationResu
     warnings.push(`JWT secret is ${trimmed.length} chars. Recommended: ${RECOMMENDED_SECRET_LENGTH}+ characters for production use.`);
   }
 
-  // ── 4. Repeating Character / Pattern Check ──────────────────────────
-  if (isRepeatingChars(trimmed)) {
-    errors.push('JWT secret consists of a single repeating character (e.g., "aaaaaa"). Use a diverse secret.');
-  } else if (isRepeatingPattern(trimmed)) {
-    errors.push('JWT secret is a short repeating pattern (e.g., "abcabc"). Use a non-predictable secret.');
+  // ── 4. Repeating Character / Pattern Check & Sequential Patterns ───
+  // Repetitive characters (aaa, 111)
+  if (/(.)\1{2,}/.test(withoutPadding)) {
+    errors.push('Contains repetitive characters');
+  }
+
+  // Repeated patterns (abcabc, 123123)
+  if (/(.+)\1+/.test(withoutPadding)) {
+    errors.push('Contains repeated patterns');
+  }
+
+  // Sequential patterns (abc, 123, qwerty)
+  const sequentialPatterns = [
+    /abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz/i,
+    /012|123|234|345|456|567|678|789|890/,
+    /qwerty|asdfgh|zxcvbn|qazwsx/i,
+  ];
+
+  for (const pattern of sequentialPatterns) {
+    if (pattern.test(withoutPadding)) {
+      errors.push('Contains sequential patterns');
+      break;
+    }
   }
 
   // ── 5. Character Class Diversity ────────────────────────────────────
@@ -189,9 +178,10 @@ export function validateJwtSecret(secret: string | undefined): JwtValidationResu
   }
 
   // ── 6. Shannon Entropy Check ────────────────────────────────────────
-  const entropy = calculateEntropy(trimmed);
-  if (trimmed.length >= MIN_SECRET_LENGTH && entropy < 2.0) {
-    warnings.push(`JWT secret has very low entropy (${entropy.toFixed(2)} bits/char). Consider using a more random value.`);
+  const entropy = calculateShannonEntropy(withoutPadding);
+  if (entropy < 3.5) {
+    errors.push('Low entropy detected');
+    warnings.push(`Low entropy detected (Shannon entropy: ${entropy.toFixed(2)})`);
   }
 
   // ── 7. Complexity recommendation ────────────────────────────────────

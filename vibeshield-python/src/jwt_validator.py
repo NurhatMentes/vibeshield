@@ -55,41 +55,24 @@ MIN_SECRET_LENGTH = 10
 RECOMMENDED_SECRET_LENGTH = 32
 
 
-def _is_repeating_chars(s: str) -> bool:
-    """Checks whether a string consists of a single repeating character."""
-    if len(s) == 0:
-        return False
-    return all(c == s[0] for c in s)
-
-
-def _is_repeating_pattern(s: str) -> bool:
-    """Checks whether a string is a short repeating pattern (e.g., 'abcabc')."""
-    length = len(s)
-    if length < 4:
-        return False
-    for pat_len in range(1, length // 2 + 1):
-        if length % pat_len != 0:
-            continue
-        pattern = s[:pat_len]
-        if all(s[i:i + pat_len] == pattern for i in range(pat_len, length, pat_len)):
-            return True
-    return False
-
-
-def _calculate_entropy(s: str) -> float:
+def calculate_shannon_entropy(secret: str) -> float:
     """Calculates Shannon entropy (bits per character) for a given string."""
-    if len(s) == 0:
+    if not secret:
         return 0.0
-    freq: dict[str, int] = {}
-    for ch in s:
-        freq[ch] = freq.get(ch, 0) + 1
+    
+    frequency: dict[str, int] = {}
+    for char in secret:
+        frequency[char] = frequency.get(char, 0) + 1
+    
     entropy = 0.0
-    length = len(s)
-    for count in freq.values():
-        p = count / length
-        if p > 0:
-            entropy -= p * math.log2(p)
+    length = len(secret)
+    
+    for count in frequency.values():
+        probability = count / length
+        entropy -= probability * math.log2(probability)
+    
     return entropy
+
 
 
 def validate_jwt_secret(secret: Optional[str]) -> dict:
@@ -122,6 +105,8 @@ def validate_jwt_secret(secret: Optional[str]) -> dict:
         errors.append("JWT secret is empty or contains only whitespace.")
         return {"valid": False, "errors": errors, "warnings": warnings}
 
+    without_padding = trimmed.rstrip('=')
+
     # ── 2. Hardcoded Pattern Detection ─────────────────────────────────
     lower = trimmed.lower()
     for pattern in HARDCODED_PATTERNS:
@@ -144,17 +129,26 @@ def validate_jwt_secret(secret: Optional[str]) -> dict:
             f"Recommended: {RECOMMENDED_SECRET_LENGTH}+ characters for production use."
         )
 
-    # ── 4. Repeating Character / Pattern Check ─────────────────────────
-    if _is_repeating_chars(trimmed):
-        errors.append(
-            'JWT secret consists of a single repeating character (e.g., "aaaaaa"). '
-            "Use a diverse secret."
-        )
-    elif _is_repeating_pattern(trimmed):
-        errors.append(
-            'JWT secret is a short repeating pattern (e.g., "abcabc"). '
-            "Use a non-predictable secret."
-        )
+    # ── 4. Repeating Character / Pattern Check & Sequential Patterns ───
+    # Repetitive characters (aaa, 111)
+    if re.search(r'(.)\1{2,}', without_padding):
+        errors.append('Contains repetitive characters')
+
+    # Repeated patterns (abcabc, 123123)
+    if re.search(r'(.+)\1+', without_padding):
+        errors.append('Contains repeated patterns')
+
+    # Sequential patterns (abc, 123, qwerty)
+    sequential_patterns = [
+        r'abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz',
+        r'012|123|234|345|456|567|678|789|890',
+        r'qwerty|asdfgh|zxcvbn|qazwsx',
+    ]
+
+    for pattern in sequential_patterns:
+        if re.search(pattern, without_padding, re.IGNORECASE):
+            errors.append('Contains sequential patterns')
+            break
 
     # ── 5. Character Class Diversity ───────────────────────────────────
     has_upper = bool(re.search(r"[A-Z]", trimmed))
@@ -179,12 +173,10 @@ def validate_jwt_secret(secret: Optional[str]) -> dict:
         )
 
     # ── 6. Shannon Entropy Check ───────────────────────────────────────
-    entropy = _calculate_entropy(trimmed)
-    if len(trimmed) >= MIN_SECRET_LENGTH and entropy < 2.0:
-        warnings.append(
-            f"JWT secret has very low entropy ({entropy:.2f} bits/char). "
-            f"Consider using a more random value."
-        )
+    entropy = calculate_shannon_entropy(without_padding)
+    if entropy < 3.5:
+        errors.append("Low entropy detected")
+        warnings.append(f"Low entropy detected (Shannon entropy: {entropy:.2f})")
 
     # ── 7. Complexity recommendation ───────────────────────────────────
     class_count = sum([has_upper, has_lower, has_digit, has_special])
