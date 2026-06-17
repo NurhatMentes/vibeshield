@@ -9,4 +9,6 @@ export { enforceJwtSecurity } from './core/jwt-security.js';
 export { validateCorsConfig } from './core/cors-validator.js';
 export { enforceCorsPolicy } from './core/cors-security.js';
 export { detectRcePatterns } from './core/rce-detector.js';
+export { validateUrl } from './core/ssrf-protector.js';
+export { enforceSafeUrl, VibeShieldSSRFError } from './middleware/ssrf-security.js';
 export * from './types/index.js';

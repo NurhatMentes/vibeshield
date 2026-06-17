@@ -9,6 +9,8 @@ from .jwt_security import enforce_jwt_security
 from .cors_validator import validate_cors_config
 from .cors_security import enforce_cors_policy
 from .rce_detector import detect_rce_patterns
+from .ssrf_protector import validate_url
+from .middleware.ssrf_security import enforce_safe_url, VibeShieldSSRFError
 
 __all__ = [
     "VibeShieldASGIMiddleware",
@@ -25,5 +27,9 @@ __all__ = [
     "validate_cors_config",
     "enforce_cors_policy",
     "detect_rce_patterns",
+    "validate_url",
+    "enforce_safe_url",
+    "VibeShieldSSRFError",
 ]
+
 
