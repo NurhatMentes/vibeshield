@@ -8,6 +8,7 @@ from .jwt_validator import validate_jwt_secret
 from .jwt_security import enforce_jwt_security
 from .cors_validator import validate_cors_config
 from .cors_security import enforce_cors_policy
+from .rce_detector import detect_rce_patterns
 
 __all__ = [
     "VibeShieldASGIMiddleware",
@@ -23,5 +24,6 @@ __all__ = [
     "enforce_jwt_security",
     "validate_cors_config",
     "enforce_cors_policy",
+    "detect_rce_patterns",
 ]
 

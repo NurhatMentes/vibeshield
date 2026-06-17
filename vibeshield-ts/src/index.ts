@@ -8,4 +8,5 @@ export { validateJwtSecret } from './core/jwt-validator.js';
 export { enforceJwtSecurity } from './core/jwt-security.js';
 export { validateCorsConfig } from './core/cors-validator.js';
 export { enforceCorsPolicy } from './core/cors-security.js';
+export { detectRcePatterns } from './core/rce-detector.js';
 export * from './types/index.js';
