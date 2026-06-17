@@ -29,6 +29,13 @@ from .middleware.authorization import (
     require_permission,
     require_ownership,
 )
+from .password_protector import (
+    validate_password,
+    calculate_shannon_entropy,
+    generate_password_policy_report,
+    COMMON_PASSWORDS,
+)
+from .middleware.password_validator import validate_password_policy
 
 __all__ = [
     "VibeShieldASGIMiddleware",
@@ -66,6 +73,11 @@ __all__ = [
     "require_role",
     "require_permission",
     "require_ownership",
+    "validate_password",
+    "calculate_shannon_entropy",
+    "generate_password_policy_report",
+    "COMMON_PASSWORDS",
+    "validate_password_policy",
 ]
 
 

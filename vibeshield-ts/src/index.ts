@@ -29,3 +29,8 @@ export {
 export { requireAuth, requireRole, requirePermission, requireOwnership } from './middleware/authorization.js';
 export type { UserContext } from './core/authorization-protector.js';
 export type { AuthOptions } from './middleware/authorization.js';
+
+export { validatePassword, calculateShannonEntropy, generatePasswordPolicyReport, COMMON_PASSWORDS } from './core/password-protector.js';
+export { validatePasswordMiddleware } from './middleware/password-validator.js';
+export type { PasswordContext, PasswordValidationResult, PasswordPolicyOptions } from './core/password-protector.js';
+
