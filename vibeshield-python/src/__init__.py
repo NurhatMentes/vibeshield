@@ -11,6 +11,8 @@ from .cors_security import enforce_cors_policy
 from .rce_detector import detect_rce_patterns
 from .ssrf_protector import validate_url
 from .middleware.ssrf_security import enforce_safe_url, VibeShieldSSRFError
+from .command_sanitizer import sanitize_shell_input, validate_safe_command, VibeShieldCommandInjectionError
+from .middleware.safe_exec import safe_exec
 
 __all__ = [
     "VibeShieldASGIMiddleware",
@@ -30,6 +32,10 @@ __all__ = [
     "validate_url",
     "enforce_safe_url",
     "VibeShieldSSRFError",
+    "sanitize_shell_input",
+    "validate_safe_command",
+    "safe_exec",
+    "VibeShieldCommandInjectionError",
 ]
 
 

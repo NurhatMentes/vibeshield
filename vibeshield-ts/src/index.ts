@@ -11,4 +11,7 @@ export { enforceCorsPolicy } from './core/cors-security.js';
 export { detectRcePatterns } from './core/rce-detector.js';
 export { validateUrl } from './core/ssrf-protector.js';
 export { enforceSafeUrl, VibeShieldSSRFError } from './middleware/ssrf-security.js';
+export { sanitizeShellInput, validateSafeCommand, VibeShieldCommandInjectionError } from './core/command-sanitizer.js';
+export { safeExec } from './middleware/safe-exec.js';
 export * from './types/index.js';
+
