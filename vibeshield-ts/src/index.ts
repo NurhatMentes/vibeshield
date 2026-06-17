@@ -16,3 +16,6 @@ export { safeExec } from './middleware/safe-exec.js';
 export * from './types/index.js';
 export { safeJsonParse, detectUnsafeDeserialization, VibeShieldDeserializationError } from './core/deserialization-protector.js';
 export { enforceSafeJson } from './middleware/safe-parser.js';
+export { validateSchema } from './core/schema-validator.js';
+export { validateRequest } from './middleware/request-validator.js';
+export type { ValidationError, ValidationResult, SchemaDefinition, FieldSchema } from './core/schema-validator.js';
