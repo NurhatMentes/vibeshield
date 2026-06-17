@@ -17,6 +17,18 @@ from .deserialization_protector import safe_json_parse, detect_unsafe_deserializ
 from .middleware.safe_parser import enforce_safe_json
 from .schema_validator import validate_schema
 from .middleware.request_validator import validate_request
+from .authorization_protector import (
+    validate_resource_ownership,
+    check_permission,
+    detect_missing_auth_middleware,
+    VibeShieldAuthorizationError,
+)
+from .middleware.authorization import (
+    require_auth,
+    require_role,
+    require_permission,
+    require_ownership,
+)
 
 __all__ = [
     "VibeShieldASGIMiddleware",
@@ -46,7 +58,16 @@ __all__ = [
     "VibeShieldDeserializationError",
     "validate_schema",
     "validate_request",
+    "validate_resource_ownership",
+    "check_permission",
+    "detect_missing_auth_middleware",
+    "VibeShieldAuthorizationError",
+    "require_auth",
+    "require_role",
+    "require_permission",
+    "require_ownership",
 ]
+
 
 
 

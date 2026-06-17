@@ -19,3 +19,13 @@ export { enforceSafeJson } from './middleware/safe-parser.js';
 export { validateSchema } from './core/schema-validator.js';
 export { validateRequest } from './middleware/request-validator.js';
 export type { ValidationError, ValidationResult, SchemaDefinition, FieldSchema } from './core/schema-validator.js';
+
+export { 
+  VibeShieldAuthorizationError, 
+  checkPermission, 
+  validateResourceOwnership, 
+  detectMissingAuthMiddleware 
+} from './core/authorization-protector.js';
+export { requireAuth, requireRole, requirePermission, requireOwnership } from './middleware/authorization.js';
+export type { UserContext } from './core/authorization-protector.js';
+export type { AuthOptions } from './middleware/authorization.js';
