@@ -14,4 +14,5 @@ export { enforceSafeUrl, VibeShieldSSRFError } from './middleware/ssrf-security.
 export { sanitizeShellInput, validateSafeCommand, VibeShieldCommandInjectionError } from './core/command-sanitizer.js';
 export { safeExec } from './middleware/safe-exec.js';
 export * from './types/index.js';
-
+export { safeJsonParse, detectUnsafeDeserialization, VibeShieldDeserializationError } from './core/deserialization-protector.js';
+export { enforceSafeJson } from './middleware/safe-parser.js';

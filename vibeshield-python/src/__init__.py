@@ -13,6 +13,8 @@ from .ssrf_protector import validate_url
 from .middleware.ssrf_security import enforce_safe_url, VibeShieldSSRFError
 from .command_sanitizer import sanitize_shell_input, validate_safe_command, VibeShieldCommandInjectionError
 from .middleware.safe_exec import safe_exec
+from .deserialization_protector import safe_json_parse, detect_unsafe_deserialization, VibeShieldDeserializationError
+from .middleware.safe_parser import enforce_safe_json
 
 __all__ = [
     "VibeShieldASGIMiddleware",
@@ -36,6 +38,10 @@ __all__ = [
     "validate_safe_command",
     "safe_exec",
     "VibeShieldCommandInjectionError",
+    "safe_json_parse",
+    "detect_unsafe_deserialization",
+    "enforce_safe_json",
+    "VibeShieldDeserializationError",
 ]
 
 
