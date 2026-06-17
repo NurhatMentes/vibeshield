@@ -6,4 +6,6 @@ export { vibeFetch } from './core/fetch.js';
 export { sanitizeStackTrace } from './core/stack-sanitizer.js';
 export { validateJwtSecret } from './core/jwt-validator.js';
 export { enforceJwtSecurity } from './core/jwt-security.js';
+export { validateCorsConfig } from './core/cors-validator.js';
+export { enforceCorsPolicy } from './core/cors-security.js';
 export * from './types/index.js';

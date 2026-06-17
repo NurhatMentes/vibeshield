@@ -6,6 +6,8 @@ from .fetch import vibe_fetch
 from .stack_sanitizer import sanitize_traceback
 from .jwt_validator import validate_jwt_secret
 from .jwt_security import enforce_jwt_security
+from .cors_validator import validate_cors_config
+from .cors_security import enforce_cors_policy
 
 __all__ = [
     "VibeShieldASGIMiddleware",
@@ -19,5 +21,7 @@ __all__ = [
     "sanitize_traceback",
     "validate_jwt_secret",
     "enforce_jwt_security",
+    "validate_cors_config",
+    "enforce_cors_policy",
 ]
 
