@@ -238,34 +238,39 @@ Enterprise password validation with **embedded blacklist** of top 200 common pas
 
 ### 🤖 Phase 5 — AI Safety
 
-#### 🛡️ Prompt Injection Mitigation
-Detects and blocks OWASP #1 LLM vulnerability: Prompt Injection, Jailbreaking, and Prompt Leaking using zero-dependency heuristic scoring.
+#### 🛡️ Prompt Injection Mitigation (Prompt Shield)
+Detects and blocks OWASP #1 LLM vulnerability: Prompt Injection, Jailbreaking, and Prompt Leaking using zero-dependency heuristic scoring. Automatically injects canary tokens for leak detection.
 
-- 🔍 **Multi-layer scoring:** 50+ patterns classifying risk (low, medium, high, critical)
-- 🧹 **Sanitization:** Wraps user input in delimiters and neutralizes injection patterns
-- 🕵️ **Leak Detection:** Uses canary tokens to identify system prompt leakage in LLM outputs
-- 🔌 **Middleware/Decorators:** Intercepts request bodies and injects canary tokens automatically
-
-**TypeScript Example:**
+##### TypeScript Example
 ```typescript
 import { promptShieldMiddleware } from '@vibeshield/core';
 
-app.post('/api/chat', promptShieldMiddleware({ threshold: 100 }), (req, res) => {
-  // Access automatically injected canary token
-  const canary = req.promptShieldCanary; 
-  res.json({ message: 'Success' });
+// In Next.js / Express Route Handler
+app.post('/api/chat', promptShieldMiddleware(), (req, res) => {
+  // req.promptShieldCanary contains the generated canary token
+  // req.promptShieldResult contains safety scan details
+  const userPrompt = req.body.prompt;
+  const systemPrompt = req.body.systemPrompt; // automatically includes canary token
+  
+  // call LLM with systemPrompt and userPrompt...
+  res.json({ status: 'success' });
 });
 ```
 
-**Python Example:**
+##### Python Example
 ```python
+from flask import request
 from vibeshield.core import prompt_shield_middleware
 
-@app.post("/chat")
-@prompt_shield_middleware(threshold=100)
+@app.route("/api/chat", methods=["POST"])
+@prompt_shield_middleware()
 def chat_endpoint():
-    # Access automatically injected canary token
-    canary = request.prompt_shield_canary
+    # request.prompt_shield_canary contains the generated canary token
+    # request.prompt_shield_result contains safety scan details
+    user_prompt = request.json.get("prompt")
+    system_prompt = request.json.get("systemPrompt") # automatically includes canary token
+    
+    # call LLM...
     return {"status": "success"}
 ```
 
@@ -416,7 +421,7 @@ cd vibeshield-python && pytest
 vibeshield/
 ├── vibeshield-ts/                    # TypeScript stack
 │   ├── src/
-│   │   ├── core/                     # 10 security modules
+│   │   ├── core/                     # 11 security modules
 │   │   │   ├── stack-sanitizer.ts
 │   │   │   ├── jwt-validator.ts
 │   │   │   ├── cors-validator.ts
@@ -426,13 +431,17 @@ vibeshield/
 │   │   │   ├── deserialization-protector.ts
 │   │   │   ├── schema-validator.ts
 │   │   │   ├── authorization-protector.ts
-│   │   │   └── password-protector.ts
+│   │   │   ├── password-protector.ts
+│   │   │   └── prompt-shield.ts
 │   │   └── middleware/               # Integration wrappers
-│   └── tests/                        # 376 Vitest tests
+│   └── tests/                        # 420 Vitest tests
 │
 ├── vibeshield-python/                # Python stack
 │   ├── src/                          # Mirror of TS modules
-│   └── tests/                        # 376 pytest tests
+│   │   ├── prompt_shield.py
+│   │   └── middleware/
+│   │       └── prompt_shield_middleware.py
+│   └── tests/                        # 420 pytest tests
 │
 └── ai-rules/                         # AI assistant integration
     ├── cursorrules

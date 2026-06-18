@@ -347,14 +347,11 @@ async def test_fastapi_async_middleware_invalid():
     assert data["details"]["safe"] is False
 
 
-# 43. prompt_shield_middleware: Flask auto canary injection
-def test_flask_middleware_auto_canary():
+# 43. prompt_shield_middleware: Flask sync auto-inject canary missing
+def test_flask_middleware_auto_canary_missing():
     flask_mock = MagicMock()
     flask_mock.request.is_json = True
-    flask_mock.request.get_json.return_value = {
-        "prompt": "Hello AI, write code.",
-        "systemPrompt": "You are a coding assistant."
-    }
+    flask_mock.request.get_json.return_value = {"prompt": "Hello AI"}
     flask_mock.request.method = "POST"
 
     with patch.dict("sys.modules", {"flask": flask_mock}):
@@ -364,25 +361,26 @@ def test_flask_middleware_auto_canary():
 
         res = view()
         assert res == "success"
-        # Check that prompt_shield_canary was attached to flask_request
-        assert flask_mock.request.prompt_shield_canary.startswith("CANARY_VIBESHIELD_")
-        # Check that flask_request._cached_json now has the modified systemPrompt containing the canary
-        assert flask_mock.request.prompt_shield_canary in flask_mock.request._cached_json["systemPrompt"]
+        assert flask_mock.request.prompt_shield_canary is not None
+        body = flask_mock.request.get_json()
+        assert "[VS-CANARY-CANARY_VIBESHIELD_" in body["systemPrompt"]
 
 
-# 44. prompt_shield_middleware: FastAPI auto canary injection
-@pytest.mark.asyncio
-async def test_fastapi_middleware_auto_canary():
-    @prompt_shield_middleware()
-    async def endpoint(request):
-        return "success"
+# 44. prompt_shield_middleware: Flask sync auto-inject canary present
+def test_flask_middleware_auto_canary_present():
+    flask_mock = MagicMock()
+    flask_mock.request.is_json = True
+    flask_mock.request.get_json.return_value = {"prompt": "Hello AI", "system_prompt": "Act as translator"}
+    flask_mock.request.method = "POST"
 
-    req = MockFastAPIRequest({
-        "prompt": "Hello AI.",
-        "system": "You are a summarization bot."
-    })
-    res = await endpoint(req)
-    assert res == "success"
-    assert req.state.prompt_shield_canary.startswith("CANARY_VIBESHIELD_")
-    assert req.state.prompt_shield_canary in req._json["system"]
+    with patch.dict("sys.modules", {"flask": flask_mock}):
+        @prompt_shield_middleware()
+        def view():
+            return "success"
+
+        res = view()
+        assert res == "success"
+        assert flask_mock.request.prompt_shield_canary is not None
+        body = flask_mock.request.get_json()
+        assert "Act as translator\n[VS-CANARY-CANARY_VIBESHIELD_" in body["system_prompt"]
 

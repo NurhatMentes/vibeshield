@@ -1,6 +1,6 @@
 import functools
 import inspect
-import json
+import re
 from typing import Any, Callable, Dict, List, Optional
 from ..prompt_shield import detect_prompt_injection, generate_canary_token
 
@@ -44,10 +44,46 @@ def prompt_shield(
                         if hasattr(fastapi_request, '_json'):
                             body = fastapi_request._json
                         else:
+                            import json
                             body_bytes = await fastapi_request.body()
                             body = json.loads(body_bytes.decode('utf-8'))
                     except Exception:
                         body = {}
+
+                    body = body or {}
+
+                    # Auto-inject canary token into system prompt if not present
+                    system_prompt_fields = ['systemPrompt', 'system_prompt', 'system', 'instructions']
+                    system_prompt_field = next((f for f in system_prompt_fields if f in body), None)
+                    canary_token = ''
+                    has_canary = False
+
+                    if system_prompt_field:
+                        current_sys_prompt = body[system_prompt_field]
+                        if isinstance(current_sys_prompt, str):
+                            match = re.search(r'CANARY_VIBESHIELD_[a-f0-9]{32}', current_sys_prompt, re.IGNORECASE)
+                            if match:
+                                has_canary = True
+                                canary_token = match.group(0)
+
+                    if not has_canary:
+                        canary_token = generate_canary_token()
+                        if system_prompt_field:
+                            body[system_prompt_field] = f"{body[system_prompt_field]}\n[VS-CANARY-{canary_token}]"
+                        else:
+                            system_prompt_field = 'systemPrompt'
+                            body[system_prompt_field] = f"[VS-CANARY-{canary_token}]"
+
+                    fastapi_request.state.prompt_shield_canary = canary_token
+                    
+                    async def mock_json():
+                        return body
+                    fastapi_request.json = mock_json
+
+                    async def mock_body():
+                        import json
+                        return json.dumps(body).encode('utf-8')
+                    fastapi_request.body = mock_body
 
                     max_score = 0
                     for field in scan_fields:
@@ -75,37 +111,10 @@ def prompt_shield(
                                 }
                             )
 
-                    # Automatic Canary Token Injection
-                    system_prompt_field = ""
-                    if "systemPrompt" in body:
-                        system_prompt_field = "systemPrompt"
-                    elif "system_prompt" in body:
-                        system_prompt_field = "system_prompt"
-                    elif "system" in body:
-                        system_prompt_field = "system"
-
-                    canary = ""
-                    if system_prompt_field:
-                        system_prompt = body.get(system_prompt_field) or ""
-                        if isinstance(system_prompt, str) and "CANARY_VIBESHIELD_" not in system_prompt:
-                            canary = generate_canary_token()
-                            system_prompt = f"{system_prompt}\n{canary}" if system_prompt else canary
-                            body[system_prompt_field] = system_prompt
-                    else:
-                        canary = generate_canary_token()
-                        body["systemPrompt"] = canary
-
-                    # Overwrite body and cache to reflect changes down the line
-                    fastapi_request._json = body
-                    fastapi_request._body = json.dumps(body).encode('utf-8')
-
-                    # Attach result and canary to request state
                     if hasattr(fastapi_request, 'state'):
                         fastapi_request.state.prompt_shield_result = worst_result
-                        fastapi_request.state.prompt_shield_canary = canary
                     else:
                         fastapi_request.prompt_shield_result = worst_result
-                        fastapi_request.prompt_shield_canary = canary
 
                 return await func(*args, **kwargs)
             return async_wrapper
@@ -134,6 +143,33 @@ def prompt_shield(
                     if flask_request.is_json:
                         body = flask_request.get_json() or {}
 
+                    body = body or {}
+
+                    # Auto-inject canary token into system prompt if not present
+                    system_prompt_fields = ['systemPrompt', 'system_prompt', 'system', 'instructions']
+                    system_prompt_field = next((f for f in system_prompt_fields if f in body), None)
+                    canary_token = ''
+                    has_canary = False
+
+                    if system_prompt_field:
+                        current_sys_prompt = body[system_prompt_field]
+                        if isinstance(current_sys_prompt, str):
+                            match = re.search(r'CANARY_VIBESHIELD_[a-f0-9]{32}', current_sys_prompt, re.IGNORECASE)
+                            if match:
+                                has_canary = True
+                                canary_token = match.group(0)
+
+                    if not has_canary:
+                        canary_token = generate_canary_token()
+                        if system_prompt_field:
+                            body[system_prompt_field] = f"{body[system_prompt_field]}\n[VS-CANARY-{canary_token}]"
+                        else:
+                            system_prompt_field = 'systemPrompt'
+                            body[system_prompt_field] = f"[VS-CANARY-{canary_token}]"
+
+                    flask_request.prompt_shield_canary = canary_token
+                    flask_request.get_json = lambda *a, **kw: body
+
                     max_score = 0
                     for field in scan_fields:
                         val = body.get(field)
@@ -153,29 +189,7 @@ def prompt_shield(
                                 "details": worst_result
                             }), 403
 
-                    # Automatic Canary Token Injection
-                    system_prompt_field = ""
-                    if "systemPrompt" in body:
-                        system_prompt_field = "systemPrompt"
-                    elif "system_prompt" in body:
-                        system_prompt_field = "system_prompt"
-                    elif "system" in body:
-                        system_prompt_field = "system"
-
-                    canary = ""
-                    if system_prompt_field:
-                        system_prompt = body.get(system_prompt_field) or ""
-                        if isinstance(system_prompt, str) and "CANARY_VIBESHIELD_" not in system_prompt:
-                            canary = generate_canary_token()
-                            system_prompt = f"{system_prompt}\n{canary}" if system_prompt else canary
-                            body[system_prompt_field] = system_prompt
-                    else:
-                        canary = generate_canary_token()
-                        body["systemPrompt"] = canary
-
-                    flask_request._cached_json = body
                     flask_request.prompt_shield_result = worst_result
-                    flask_request.prompt_shield_canary = canary
                     return func(*args, **kwargs)
 
                 fastapi_request = None
@@ -195,9 +209,45 @@ def prompt_shield(
                         if hasattr(fastapi_request, '_json'):
                             body = fastapi_request._json
                         else:
+                            import json
                             body = json.loads(fastapi_request._body.decode('utf-8'))
                     except Exception:
                         body = {}
+
+                    body = body or {}
+
+                    # Auto-inject canary token into system prompt if not present
+                    system_prompt_fields = ['systemPrompt', 'system_prompt', 'system', 'instructions']
+                    system_prompt_field = next((f for f in system_prompt_fields if f in body), None)
+                    canary_token = ''
+                    has_canary = False
+
+                    if system_prompt_field:
+                        current_sys_prompt = body[system_prompt_field]
+                        if isinstance(current_sys_prompt, str):
+                            match = re.search(r'CANARY_VIBESHIELD_[a-f0-9]{32}', current_sys_prompt, re.IGNORECASE)
+                            if match:
+                                has_canary = True
+                                canary_token = match.group(0)
+
+                    if not has_canary:
+                        canary_token = generate_canary_token()
+                        if system_prompt_field:
+                            body[system_prompt_field] = f"{body[system_prompt_field]}\n[VS-CANARY-{canary_token}]"
+                        else:
+                            system_prompt_field = 'systemPrompt'
+                            body[system_prompt_field] = f"[VS-CANARY-{canary_token}]"
+
+                    fastapi_request.state.prompt_shield_canary = canary_token
+                    
+                    async def mock_json():
+                        return body
+                    fastapi_request.json = mock_json
+
+                    async def mock_body():
+                        import json
+                        return json.dumps(body).encode('utf-8')
+                    fastapi_request.body = mock_body
 
                     max_score = 0
                     for field in scan_fields:
@@ -225,35 +275,10 @@ def prompt_shield(
                                 }
                             )
 
-                    # Automatic Canary Token Injection
-                    system_prompt_field = ""
-                    if "systemPrompt" in body:
-                        system_prompt_field = "systemPrompt"
-                    elif "system_prompt" in body:
-                        system_prompt_field = "system_prompt"
-                    elif "system" in body:
-                        system_prompt_field = "system"
-
-                    canary = ""
-                    if system_prompt_field:
-                        system_prompt = body.get(system_prompt_field) or ""
-                        if isinstance(system_prompt, str) and "CANARY_VIBESHIELD_" not in system_prompt:
-                            canary = generate_canary_token()
-                            system_prompt = f"{system_prompt}\n{canary}" if system_prompt else canary
-                            body[system_prompt_field] = system_prompt
-                    else:
-                        canary = generate_canary_token()
-                        body["systemPrompt"] = canary
-
-                    fastapi_request._json = body
-                    fastapi_request._body = json.dumps(body).encode('utf-8')
-
                     if hasattr(fastapi_request, 'state'):
                         fastapi_request.state.prompt_shield_result = worst_result
-                        fastapi_request.state.prompt_shield_canary = canary
                     else:
                         fastapi_request.prompt_shield_result = worst_result
-                        fastapi_request.prompt_shield_canary = canary
 
                 return func(*args, **kwargs)
             return sync_wrapper

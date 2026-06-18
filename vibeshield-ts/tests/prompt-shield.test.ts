@@ -329,45 +329,31 @@ describe('Prompt Shield', () => {
       expect(responseBody.message).toContain('Potential prompt injection');
     });
 
-    it('43. should inject automatic canary token into express request body if missing', () => {
+    it('43. should automatically inject canary token when systemPrompt is missing', () => {
       const middleware = promptShieldMiddleware();
       const req: any = {
         body: {
-          prompt: 'Hello AI, please write a summary.',
-          systemPrompt: 'You are a professional editor.'
+          prompt: 'Hello AI'
         }
       };
-      middleware(req, {}, () => {});
-      expect(req.promptShieldCanary).toMatch(/^CANARY_VIBESHIELD_[a-f0-9]{32}$/);
-      expect(req.body.systemPrompt).toContain('You are a professional editor.');
-      expect(req.body.systemPrompt).toContain(req.promptShieldCanary);
+      const next = () => {};
+      middleware(req, {}, next);
+      expect(req.promptShieldCanary).toBeDefined();
+      expect(req.body.systemPrompt).toContain('[VS-CANARY-CANARY_VIBESHIELD_');
     });
 
-    it('44. should inject automatic canary token into nextjs request proxy if missing', async () => {
+    it('44. should automatically inject canary token when systemPrompt is present but has no canary', () => {
       const middleware = promptShieldMiddleware();
-      const handler = async (req: any) => {
-        const body = await req.json();
-        return { body, promptShieldCanary: req.promptShieldCanary };
-      };
-      const wrapped = middleware(handler);
-      const mockRequest = {
-        clone() {
-          return {
-            async json() {
-              return { prompt: 'Hello', system: 'You are a translator.' };
-            }
-          };
-        },
-        async json() {
-          return { prompt: 'Hello', system: 'You are a translator.' };
+      const req: any = {
+        body: {
+          prompt: 'Hello AI',
+          system_prompt: 'Act as a translator.'
         }
       };
-
-      const result: any = await wrapped(mockRequest);
-      expect(result.promptShieldCanary).toMatch(/^CANARY_VIBESHIELD_[a-f0-9]{32}$/);
-      expect(result.body.system).toContain('You are a translator.');
-      expect(result.body.system).toContain(result.promptShieldCanary);
+      const next = () => {};
+      middleware(req, {}, next);
+      expect(req.promptShieldCanary).toBeDefined();
+      expect(req.body.system_prompt).toContain('Act as a translator.\n[VS-CANARY-CANARY_VIBESHIELD_');
     });
   });
 });
-

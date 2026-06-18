@@ -1,4 +1,4 @@
-import { detectPromptInjection, generateCanaryToken, PromptShieldResult, PromptShieldOptions } from '../core/prompt-shield.js';
+import { detectPromptInjection, PromptShieldResult, PromptShieldOptions, generateCanaryToken } from '../core/prompt-shield.js';
 
 export interface PromptShieldMiddlewareOptions extends PromptShieldOptions {
   fields?: string[];
@@ -26,6 +26,38 @@ export function promptShieldMiddleware(options?: PromptShieldMiddlewareOptions) 
             body = {};
           }
         }
+
+        body = body || {};
+
+        // Auto-inject canary token into system prompt if not present
+        const systemPromptFields = ['systemPrompt', 'system_prompt', 'system', 'instructions'];
+        let systemPromptField = systemPromptFields.find(f => body[f] !== undefined);
+        let canaryToken = '';
+        let hasCanary = false;
+
+        if (systemPromptField) {
+          const currentSysPrompt = body[systemPromptField];
+          if (typeof currentSysPrompt === 'string') {
+            const match = currentSysPrompt.match(/CANARY_VIBESHIELD_[a-f0-9]{32}/i);
+            if (match) {
+              hasCanary = true;
+              canaryToken = match[0];
+            }
+          }
+        }
+
+        if (!hasCanary) {
+          canaryToken = generateCanaryToken();
+          if (systemPromptField) {
+            body[systemPromptField] = `${body[systemPromptField]}\n[VS-CANARY-${canaryToken}]`;
+          } else {
+            systemPromptField = 'systemPrompt';
+            body[systemPromptField] = `[VS-CANARY-${canaryToken}]`;
+          }
+        }
+
+        (webReq as any).promptShieldCanary = canaryToken;
+        webReq.json = async () => body;
 
         let maxScore = 0;
         let worstResult: PromptShieldResult = {
@@ -67,46 +99,46 @@ export function promptShieldMiddleware(options?: PromptShieldMiddlewareOptions) 
           }
         }
 
-        // Automatic Canary Token Injection for System Prompt
-        let systemPromptField = '';
-        if ('systemPrompt' in body) systemPromptField = 'systemPrompt';
-        else if ('system_prompt' in body) systemPromptField = 'system_prompt';
-        else if ('system' in body) systemPromptField = 'system';
+        // Attach result to request
+        (webReq as any).promptShieldResult = worstResult;
 
-        let canary = '';
-        if (systemPromptField) {
-          let systemPrompt = body[systemPromptField] || '';
-          if (typeof systemPrompt === 'string' && !systemPrompt.includes('CANARY_VIBESHIELD_')) {
-            canary = generateCanaryToken();
-            systemPrompt = systemPrompt ? `${systemPrompt}\n${canary}` : canary;
-            body[systemPromptField] = systemPrompt;
-          }
-        } else {
-          canary = generateCanaryToken();
-          body['systemPrompt'] = canary;
-        }
-
-        // Intercept webReq json method and attach result/canary
-        const interceptedReq = new Proxy(webReq, {
-          get(target, prop, receiver) {
-            if (prop === 'json') {
-              return async () => body;
-            }
-            if (prop === 'promptShieldResult') {
-              return worstResult;
-            }
-            if (prop === 'promptShieldCanary') {
-              return canary;
-            }
-            return Reflect.get(target, prop, receiver);
-          }
-        });
-
-        return handler(interceptedReq, ...args);
+        return handler(webReq, ...args);
       };
     }
 
     // Express middleware
+    let body = req.body || {};
+    
+    // Auto-inject canary token into system prompt if not present
+    const systemPromptFields = ['systemPrompt', 'system_prompt', 'system', 'instructions'];
+    let systemPromptField = systemPromptFields.find(f => body[f] !== undefined);
+    let canaryToken = '';
+    let hasCanary = false;
+
+    if (systemPromptField) {
+      const currentSysPrompt = body[systemPromptField];
+      if (typeof currentSysPrompt === 'string') {
+        const match = currentSysPrompt.match(/CANARY_VIBESHIELD_[a-f0-9]{32}/i);
+        if (match) {
+          hasCanary = true;
+          canaryToken = match[0];
+        }
+      }
+    }
+
+    if (!hasCanary) {
+      canaryToken = generateCanaryToken();
+      if (systemPromptField) {
+        body[systemPromptField] = `${body[systemPromptField]}\n[VS-CANARY-${canaryToken}]`;
+      } else {
+        systemPromptField = 'systemPrompt';
+        body[systemPromptField] = `[VS-CANARY-${canaryToken}]`;
+      }
+    }
+
+    req.promptShieldCanary = canaryToken;
+    req.body = body;
+
     let maxScore = 0;
     let worstResult: PromptShieldResult = {
       safe: true,
@@ -116,7 +148,6 @@ export function promptShieldMiddleware(options?: PromptShieldMiddlewareOptions) 
       summary: 'Input is safe'
     };
 
-    const body = req.body || {};
     for (const field of fields) {
       const val = body[field];
       if (typeof val === 'string' && val) {
@@ -141,27 +172,7 @@ export function promptShieldMiddleware(options?: PromptShieldMiddlewareOptions) 
       }
     }
 
-    // Automatic Canary Token Injection for System Prompt
-    let systemPromptField = '';
-    if ('systemPrompt' in body) systemPromptField = 'systemPrompt';
-    else if ('system_prompt' in body) systemPromptField = 'system_prompt';
-    else if ('system' in body) systemPromptField = 'system';
-
-    let canary = '';
-    if (systemPromptField) {
-      let systemPrompt = body[systemPromptField] || '';
-      if (typeof systemPrompt === 'string' && !systemPrompt.includes('CANARY_VIBESHIELD_')) {
-        canary = generateCanaryToken();
-        systemPrompt = systemPrompt ? `${systemPrompt}\n${canary}` : canary;
-        body[systemPromptField] = systemPrompt;
-      }
-    } else {
-      canary = generateCanaryToken();
-      body['systemPrompt'] = canary;
-    }
-
     req.promptShieldResult = worstResult;
-    req.promptShieldCanary = canary;
 
     if (typeof next === 'function') {
       next();
