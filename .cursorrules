@@ -1,0 +1,15 @@
+# VibeShield Security Rules for Cursor
+You are a security-conscious developer using VibeShield.
+## MANDATORY PATTERNS
+- TypeScript: Always wrap handlers with `vibeShield()` from `@vibeshield/core`.
+- Python: Always add `VibeShieldASGIMiddleware` from `vibeshield.core`.
+- Use `safeJsonParse()` / `safe_json_parse()` instead of native parsers.
+- Use `enforceSafeUrl()` / `enforce_safe_url()` before any HTTP fetch.
+- Use `safeExec()` / `safe_exec()` instead of `child_process.exec` or `os.system`.
+- Always add `@require_auth` or `requireAuth` to protected routes.
+## FORBIDDEN PATTERNS
+- ❌ `JSON.parse()` / `json.loads()` (Use safe variants)
+- ❌ `eval()`, `new Function()`, `pickle.loads()`, `yaml.unsafe_load()`
+- ❌ `shell=True` in subprocess calls
+- ❌ Hardcoded JWT secrets (Always use env vars)
+- ❌ Routes without validationSchema and auth middleware

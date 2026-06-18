@@ -1,0 +1,10 @@
+# Windsurf Rules — VibeShield
+This project uses VibeShield as its runtime security layer. All generated code MUST comply.
+### Must-Do Checklist
+- [ ] Every API route uses `vibeShield()` wrapper or `VibeShieldASGIMiddleware`
+- [ ] All user inputs have explicit `validationSchema`
+- [ ] Authentication decorators/middleware are present on protected routes
+- [ ] No raw `JSON.parse` / `json.loads` — use safe variants
+- [ ] No direct `fetch()` / `requests.get()` — validate URLs first (SSRF protection)
+- [ ] No `eval`, `exec`, `pickle.loads`, or shell=True execution
+Violations of these rules should be auto-corrected to use VibeShield utilities.

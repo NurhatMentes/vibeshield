@@ -1,0 +1,4 @@
+# Cline Rules — VibeShield Security
+Context: Security-focused project using VibeShield runtime protection.
+Blocked Patterns: `JSON.parse()` without wrapper, `fetch()` without SSRF check, `eval/exec/pickle`, hardcoded secrets, routes without auth.
+Preferred Patterns: Always use `safeJsonParse`, `enforceSafeUrl`, `safeExec`, and `vibeShield()` wrappers. Default to restrictive settings (strict schema, auth required).

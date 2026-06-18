@@ -1,0 +1,13 @@
+---
+description: VibeShield security rules for all code generation
+globs:
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.js"
+  - "**/*.py"
+alwaysApply: true
+---
+# VibeShield Security Rules
+Every HTTP Handler Must use `vibeShield()` wrapper (TS) or `VibeShieldASGIMiddleware` (Python) and define `validationSchema`.
+Forbidden: `eval()`, `pickle.loads()`, `shell=True`, hardcoded secrets.
+Always use `safeJsonParse`, `enforceSafeUrl`, and `safeExec`.
