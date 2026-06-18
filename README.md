@@ -77,7 +77,6 @@ These features are typically found only in enterprise security platforms, now av
 
 - 🛡️ **15 Security Modules** — Comprehensive protection across all attack vectors
 - 🧪 **840 Passing Tests** — Enterprise-grade reliability with dual-stack parity
-- ⚡ **70.7x Faster** — Built-in LRU cache with nanosecond monitoring
 - 🎯 **Zero Dependencies** — No supply-chain risk, serverless-friendly cold starts
 - 💸 **VibeBudgeter** — Financial circuit-breaker for AI/API costs
 - 🤖 **AI Assistant Native** — Ships with rules files for Cursor, Claude, Copilot, Windsurf & more
@@ -445,48 +444,6 @@ def chat_endpoint():
 
 ---
 
-## ⚡ Performance Benchmarks
-
-**Test Environment:**
-- Node.js 20.x, macOS M2 (8-core)
-- 1000 requests, 10 concurrent connections
-- Cold start: First request after server restart
-- Warm cache: Subsequent requests with cache hits
-
-**Methodology:**
-```bash
-# Run benchmark
-cd scripts
-node benchmark.js
-
-# Results:
-# Without VibeShield: 9.23 ms/req (avg)
-# With VibeShield (cache hit): 0.13 ms/req (avg)
-# Improvement: 70.7x faster
-```
-
-Why faster?
-- LRU cache eliminates redundant computations
-- Early validation rejects invalid requests before expensive operations
-- Optimized middleware chain reduces overhead
-- Benchmark script: `scripts/benchmark.js`
-
-### TypeScript (Next.js)
-
-| Metric | Without VibeShield | With VibeShield | Improvement |
-|--------|-------------------|-----------------|-------------|
-| Response Time | 9.23 ms/req | 0.13 ms/req | **70.7x faster** |
-| DB Latency | 9,233 ms | 130 ms | **98.59% reduced** |
-| DB Queries | 1,000 | 1 | **99.90% reduced** |
-
-### Python (FastAPI)
-
-| Metric | Without VibeShield | With VibeShield | Improvement |
-|--------|-------------------|-----------------|-------------|
-| Response Time | 15.49 ms/req | 0.55 ms/req | **27.7x faster** |
-| Execution Time | 15,492 ms | 558 ms | **96.39% reduced** |
-| DB Queries | 1,000 | 1 | **99.90% reduced** |
-
 ---
 
 ## 🔧 Advanced Features
@@ -691,6 +648,7 @@ vibeshield/
 - [ ] Dynamic token budget tuning
 - [ ] Adaptive rate-limiting (Token Bucket)
 - [ ] GraphQL support
+- [ ] Performance benchmarks with reproducible methodology
 
 ### 🔮 Future (Phase 6)
 - [ ] OpenTelemetry integration
