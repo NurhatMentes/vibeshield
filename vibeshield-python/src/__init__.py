@@ -22,6 +22,7 @@ from .authorization_protector import (
     check_permission,
     detect_missing_auth_middleware,
     VibeShieldAuthorizationError,
+    create_permission_matrix,
 )
 from .middleware.authorization import (
     require_auth,
@@ -42,6 +43,7 @@ from .prompt_shield import (
     detect_prompt_leak,
     detect_jailbreak,
     generate_canary_token,
+    PromptShield,
 )
 from .middleware.prompt_shield_middleware import prompt_shield as prompt_shield_middleware
 
@@ -77,6 +79,7 @@ __all__ = [
     "check_permission",
     "detect_missing_auth_middleware",
     "VibeShieldAuthorizationError",
+    "create_permission_matrix",
     "require_auth",
     "require_role",
     "require_permission",
@@ -91,6 +94,7 @@ __all__ = [
     "detect_prompt_leak",
     "detect_jailbreak",
     "generate_canary_token",
+    "PromptShield",
     "prompt_shield_middleware",
 ]
 

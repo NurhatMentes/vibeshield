@@ -289,3 +289,17 @@ class TestCorsSecurityEnforcement:
                 "allowed_origins": ["*"],
             })
         assert "CORS Security Warnings" in caplog.text
+
+    def test_wildcard_subdomain_support(self):
+        result = validate_cors_config({
+            "allowed_origins": ["https://example.com", "*.example.com"],
+        })
+        assert result["valid"] is True
+        assert len(result["errors"]) == 0
+
+    def test_invalid_wildcard_subdomain_support(self):
+        result = validate_cors_config({
+            "allowed_origins": ["*example.com"],
+        })
+        assert result["valid"] is False
+        assert any("Expected: \"https://example.com\" or \"*.example.com\"" in e for e in result["errors"])

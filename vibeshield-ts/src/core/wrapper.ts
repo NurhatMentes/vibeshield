@@ -122,6 +122,17 @@ function createSanitizedRequest(req: Request, options?: VibeShieldOptions): Requ
   return new Proxy(req, proxyHandler);
 }
 
+const defaultKeyGenerator = (req: Request): string => {
+  const url = new URL(req.url);
+  // Sort query parameters for consistent keys
+  const sortedParams = Array.from(url.searchParams.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([k, v]) => `${k}=${v}`)
+    .join('&');
+  
+  return `${req.method}:${url.pathname}${sortedParams ? '?' + sortedParams : ''}`;
+};
+
 /**
  * VibeShield: Zero-configuration interceptor wrapper for Next.js App Router API Routes.
  */
@@ -142,7 +153,7 @@ export function vibeShield(
     // 1. In-Memory Cache Lookup (Only for GET routes)
     if (cacheEnabled && isGet) {
       try {
-        const generator = options?.cache?.keyGenerator || ((r: Request) => `${r.method}:${r.url}`);
+        const generator = options?.cache?.keyGenerator || defaultKeyGenerator;
         cacheKey = generator(req);
         const cachedResponse = globalCache.get(cacheKey);
         if (cachedResponse) {

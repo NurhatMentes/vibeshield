@@ -160,3 +160,46 @@ def test_flask_caching():
     res2 = client.get("/data")
     assert res2.json["count"] == 1
     assert call_count == 1
+
+@pytest.mark.asyncio
+async def test_fastapi_caching_query_sorting():
+    global_cache.clear()
+    app = FastAPI()
+    app.add_middleware(VibeShieldASGIMiddleware, cache_enabled=True, cache_ttl=5.0)
+
+    call_count = 0
+
+    @app.get("/data")
+    async def get_data():
+        nonlocal call_count
+        call_count += 1
+        return {"count": call_count}
+
+    async with AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
+        res1 = await ac.get("/data", params={"b": "2", "a": "1"})
+        assert res1.json()["count"] == 1
+
+        res2 = await ac.get("/data", params={"a": "1", "b": "2"})
+        assert res2.json()["count"] == 1
+        assert call_count == 1
+
+def test_flask_caching_query_sorting():
+    global_cache.clear()
+    app = Flask(__name__)
+    app.wsgi_app = VibeShieldWSGIMiddleware(app.wsgi_app, cache_enabled=True, cache_ttl=5.0)
+
+    call_count = 0
+
+    @app.route("/data")
+    def get_data():
+        nonlocal call_count
+        call_count += 1
+        return jsonify({"count": call_count})
+
+    client = app.test_client()
+    res1 = client.get("/data?b=2&a=1")
+    assert res1.json["count"] == 1
+
+    res2 = client.get("/data?a=1&b=2")
+    assert res2.json["count"] == 1
+    assert call_count == 1

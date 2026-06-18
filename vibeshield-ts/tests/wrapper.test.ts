@@ -140,6 +140,27 @@ describe('VibeShield Core Wrapper (Module A)', () => {
     expect(callCount).toBe(1);
   });
 
+  it('should sort query parameters for consistent cache keys and prevent cache poisoning', async () => {
+    let callCount = 0;
+    const handler = () => {
+      callCount++;
+      return new Response(`count: ${callCount}`, { status: 200 });
+    };
+
+    const wrapped = vibeShield(handler, { cache: { enabled: true, ttl: 10 } });
+
+    const req1 = new Request('http://localhost:3000/api/users?b=2&a=1', { method: 'GET' });
+    const response1 = await wrapped(req1);
+    expect(await response1.text()).toBe('count: 1');
+
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    const req2 = new Request('http://localhost:3000/api/users?a=1&b=2', { method: 'GET' });
+    const response2 = await wrapped(req2);
+    expect(await response2.text()).toBe('count: 1');
+    expect(callCount).toBe(1);
+  });
+
   it('should not cache POST requests', async () => {
     let callCount = 0;
     const handler = () => {

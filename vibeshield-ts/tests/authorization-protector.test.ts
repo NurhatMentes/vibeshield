@@ -4,7 +4,8 @@ import {
   validateResourceOwnership,
   detectMissingAuthMiddleware,
   VibeShieldAuthorizationError,
-  UserContext
+  UserContext,
+  createPermissionMatrix
 } from '../src/core/authorization-protector.js';
 import {
   requireAuth,
@@ -345,6 +346,32 @@ describe('VibeShield Authorization & Access Control Protector', () => {
       };
       requireOwnership('id')(req, {}, next);
       expect(next).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Custom Permission Matrix', () => {
+    it('38. should merge custom matrix with default matrix', () => {
+      const customMatrix = createPermissionMatrix({
+        moderator: {
+          posts: ['read', 'write', 'delete'],
+        },
+      });
+
+      expect(customMatrix.moderator).toBeDefined();
+      expect(customMatrix.moderator.posts).toEqual(['read', 'write', 'delete']);
+      expect(customMatrix.admin.users).toContain('delete'); // Defaults preserved
+    });
+
+    it('39. should check permissions using custom matrix', () => {
+      const customMatrix = createPermissionMatrix({
+        moderator: {
+          posts: ['read', 'write', 'delete'],
+        },
+      });
+
+      expect(checkPermission('moderator', 'posts', 'delete', customMatrix)).toBe(true);
+      expect(checkPermission('moderator', 'users', 'read', customMatrix)).toBe(false);
+      expect(checkPermission('user', 'posts', 'write', customMatrix)).toBe(true); // Defaults work
     });
   });
 });

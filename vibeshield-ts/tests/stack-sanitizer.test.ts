@@ -133,4 +133,16 @@ describe('Stack Trace Sanitizer', () => {
     expect(clean).toContain('[REDACTED_DB_INFO]');
     expect(clean).toContain('[NODE_MODULES]/...');
   });
+
+  it('should redact container paths', () => {
+    const stack = 'Error at /app/src/index.js:10:5';
+    expect(sanitizeStackTrace(stack)).toContain('[PROJECT_ROOT]');
+    expect(sanitizeStackTrace(stack)).not.toContain('/app/');
+  });
+
+  it('should redact Kubernetes paths', () => {
+    const stack = 'Error at /srv/app/dist/bundle.js:1:1';
+    expect(sanitizeStackTrace(stack)).toContain('[PROJECT_ROOT]');
+    expect(sanitizeStackTrace(stack)).not.toContain('/srv/');
+  });
 });

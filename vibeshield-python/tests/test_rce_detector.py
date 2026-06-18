@@ -293,3 +293,15 @@ eval(dynamic_expr)
         assert len(result["findings"]) == 2
         assert result["findings"][0]["line"] == 2
         assert result["findings"][1]["line"] == 4
+
+    def test_is_dynamic_helpers(self):
+        from src.rce_detector import _is_dynamic
+        assert _is_dynamic("1000") is False
+        assert _is_dynamic("3.14") is False
+        assert _is_dynamic('"hello"') is False
+        assert _is_dynamic("'world'") is False
+        assert _is_dynamic("True") is False
+        assert _is_dynamic("False") is False
+        assert _is_dynamic("None") is False
+        assert _is_dynamic("x") is True
+        assert _is_dynamic("a + b") is True

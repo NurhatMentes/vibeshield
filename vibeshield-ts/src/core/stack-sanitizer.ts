@@ -35,7 +35,7 @@ const PATTERNS: ReadonlyArray<{ regex: RegExp; replacement: string | ((match: st
 
   // Absolute Unix/macOS file paths: /Users/..., /home/..., /var/..., /tmp/..., /opt/...
   {
-    regex: /\/(?:Users|home|var|tmp|opt|etc|root)\/[^\s'",)}\]:]+/g,
+    regex: /\/(?:Users|home|var|tmp|opt|etc|root|app|srv|proc|run|usr\/src|workspace|project)\/[^\s'",)}\]:]+/g,
     replacement: MARKERS.PROJECT_ROOT,
   },
 

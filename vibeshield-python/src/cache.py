@@ -37,7 +37,16 @@ class VibeShieldCache:
         with self.lock:
             if ttl is None:
                 ttl = self.default_ttl
-            expiry = time.time() + ttl
+            
+            if ttl > 60.0:
+                import sys
+                sys.stderr.write(
+                    f"[VibeShield Cache] TTL {ttl}s exceeds maximum 60s. "
+                    f"Using 60s instead. For longer caching, consider Redis or external cache.\n"
+                )
+            
+            actual_ttl = min(ttl, 60.0)
+            expiry = time.time() + actual_ttl
             
             if key in self.cache:
                 del self.cache[key]

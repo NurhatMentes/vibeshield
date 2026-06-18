@@ -77,4 +77,15 @@ describe('In-Memory Cache Module', () => {
     expect(await hit2.text()).toBe('data');
     expect(hit1).not.toBe(hit2); // different instances
   });
+
+  it('should warn when TTL exceeds 60 seconds', async () => {
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const res = new Response('data');
+    await cache.set('key-1', res, 70);
+    
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[VibeShield Cache] TTL 70s exceeds maximum 60s.')
+    );
+    consoleWarnSpy.mockRestore();
+  });
 });

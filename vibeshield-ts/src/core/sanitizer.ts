@@ -1,3 +1,15 @@
+/**
+ * ⚠️ WARNING: SQL ESCAPING IS PARTIAL MITIGATION ONLY
+ * 
+ * This sanitizer provides defense-in-depth but is NOT a substitute for:
+ * - Parameterized queries (prepared statements)
+ * - ORM query builders
+ * - Input validation
+ * 
+ * SQL escaping (single quote doubling) can be bypassed in certain character sets
+ * and edge cases. ALWAYS use parameterized queries for database operations.
+ */
+
 import { SecurityOptions } from '../types/index.js';
 
 /**

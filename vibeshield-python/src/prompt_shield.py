@@ -314,108 +314,184 @@ def generate_canary_token() -> str:
     return f"CANARY_VIBESHIELD_{random_hex}"
 
 
+def to_pattern_item(p: Any, default_type: str) -> Dict[str, Any]:
+    if isinstance(p, str):
+        escaped = re.escape(p)
+        return {
+            'pattern': re.compile(escaped, re.IGNORECASE),
+            'score': 80,
+            'label': p
+        }
+    pattern = p.get('pattern')
+    if isinstance(pattern, str):
+        pattern = re.compile(pattern, re.IGNORECASE)
+    return {
+        'pattern': pattern,
+        'score': p.get('score', 80),
+        'label': p.get('label', str(pattern))
+    }
+
+
+class PromptShield:
+    def __init__(self, options: Optional[Dict[str, Any]] = None):
+        self.options = options or {}
+        custom = self.options.get('custom_patterns')
+        custom_dict = custom if isinstance(custom, dict) else {}
+        
+        self.patterns = {
+            'direct': [
+                dict(p) for p in DIRECT_INJECTION_PATTERNS
+            ] + [
+                to_pattern_item(p, 'direct') for p in custom_dict.get('direct', [])
+            ],
+            'jailbreak': [
+                dict(p) for p in JAILBREAK_PATTERNS
+            ] + [
+                to_pattern_item(p, 'jailbreak') for p in custom_dict.get('jailbreak', [])
+            ],
+            'leaking': [
+                dict(p) for p in PROMPT_LEAK_PATTERNS
+            ] + [
+                to_pattern_item(p, 'leaking') for p in custom_dict.get('leaking', [])
+            ],
+            'virtualization': [
+                dict(p) for p in VIRTUALIZATION_PATTERNS
+            ] + [
+                to_pattern_item(p, 'virtualization') for p in custom_dict.get('virtualization', [])
+            ],
+            'indirect': [
+                dict(p) for p in INDIRECT_INJECTION_PATTERNS
+            ] + [
+                to_pattern_item(p, 'indirect') for p in custom_dict.get('indirect', [])
+            ]
+        }
+
+    def add_patterns(self, category: str, new_patterns: List[Any]) -> None:
+        if category not in self.patterns:
+            self.patterns[category] = []
+        items = [to_pattern_item(p, category) for p in new_patterns]
+        self.patterns[category].extend(items)
+
+    def remove_patterns(self, category: str, patterns_to_remove: List[str]) -> None:
+        if category not in self.patterns:
+            return
+        self.patterns[category] = [
+            p for p in self.patterns[category]
+            if p['label'] not in patterns_to_remove
+        ]
+
+    def detect_prompt_injection(self, input_text: str) -> Dict[str, Any]:
+        if not input_text:
+            return {
+                'safe': True,
+                'score': 0,
+                'risk_level': 'none',
+                'threats': [],
+                'summary': 'Input is empty'
+            }
+
+        threshold_medium = self.options.get('threshold_medium', 50)
+        threshold_high = self.options.get('threshold_high', 100)
+        threshold_critical = self.options.get('threshold_critical', 150)
+
+        threats = []
+        total_score = 0
+
+        scan_list = [
+            (self.patterns['direct'], 'direct_injection'),
+            (self.patterns['jailbreak'], 'jailbreak'),
+            (self.patterns['leaking'], 'prompt_leak'),
+            (self.patterns['virtualization'], 'virtualization'),
+            (self.patterns['indirect'], 'indirect_injection'),
+        ]
+
+        for rule_list, threat_type in scan_list:
+            for rule in rule_list:
+                if rule['pattern'].search(input_text):
+                    # False positive check matching TypeScript side
+                    if (threat_type == 'direct_injection' and
+                            rule['label'] == 'Ignore previous instructions' and
+                            FALSE_POSITIVE_EXCLUDE.search(input_text) and
+                            FALSE_POSITIVE_CONNECTIVE.search(input_text)):
+                        continue
+
+                    threats.append({
+                        'type': threat_type,
+                        'pattern': rule['label'],
+                        'score': rule['score']
+                    })
+                    total_score += rule['score']
+
+        custom_patterns = self.options.get('custom_patterns', [])
+        if isinstance(custom_patterns, list):
+            for rule in custom_patterns:
+                pattern = rule.get('pattern')
+                if pattern:
+                    if isinstance(pattern, str):
+                        pattern = re.compile(pattern, re.IGNORECASE)
+                    if pattern.search(input_text):
+                        threats.append({
+                            'type': rule.get('type', 'custom'),
+                            'pattern': pattern.pattern,
+                            'score': rule.get('score', 50)
+                        })
+                        total_score += rule.get('score', 50)
+
+        risk_level = 'none'
+        if total_score >= threshold_critical:
+            risk_level = 'critical'
+        elif total_score >= threshold_high:
+            risk_level = 'high'
+        elif total_score >= threshold_medium:
+            risk_level = 'medium'
+        elif total_score > 0:
+            risk_level = 'low'
+
+        safe = total_score == 0
+
+        summary = (
+            "Input is safe" if safe
+            else f"Detected {len(threats)} threat(s) with total score {total_score}. Risk level: {risk_level}."
+        )
+
+        return {
+            'safe': safe,
+            'score': total_score,
+            'risk_level': risk_level,
+            'threats': threats,
+            'summary': summary
+        }
+
+    def detect_jailbreak(self, input_text: str) -> Dict[str, Any]:
+        if not input_text:
+            return {'detected': False, 'score': 0, 'patterns': []}
+
+        total_score = 0
+        matched_patterns = []
+
+        for rule in self.patterns['jailbreak']:
+            if rule['pattern'].search(input_text):
+                total_score += rule['score']
+                matched_patterns.append(rule['label'])
+
+        detected = total_score >= 70
+
+        return {
+            'detected': detected,
+            'score': total_score,
+            'patterns': matched_patterns
+        }
+
+
 def detect_prompt_injection(
     input_text: str,
     options: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
-    if not input_text:
-        return {
-            'safe': True,
-            'score': 0,
-            'risk_level': 'none',
-            'threats': [],
-            'summary': 'Input is empty'
-        }
-
-    options = options or {}
-    threshold_medium = options.get('threshold_medium', 50)
-    threshold_high = options.get('threshold_high', 100)
-    threshold_critical = options.get('threshold_critical', 150)
-
-    threats = []
-    total_score = 0
-
-    scan_list = [
-        (DIRECT_INJECTION_PATTERNS, 'direct_injection'),
-        (JAILBREAK_PATTERNS, 'jailbreak'),
-        (PROMPT_LEAK_PATTERNS, 'prompt_leak'),
-        (VIRTUALIZATION_PATTERNS, 'virtualization'),
-        (INDIRECT_INJECTION_PATTERNS, 'indirect_injection'),
-    ]
-
-    for rule_list, threat_type in scan_list:
-        for rule in rule_list:
-            if rule['pattern'].search(input_text):
-                # False positive check matching TypeScript side
-                if (threat_type == 'direct_injection' and
-                        rule['label'] == 'Ignore previous instructions' and
-                        FALSE_POSITIVE_EXCLUDE.search(input_text) and
-                        FALSE_POSITIVE_CONNECTIVE.search(input_text)):
-                    continue
-
-                threats.append({
-                    'type': threat_type,
-                    'pattern': rule['label'],
-                    'score': rule['score']
-                })
-                total_score += rule['score']
-
-    custom_patterns = options.get('custom_patterns', [])
-    for rule in custom_patterns:
-        pattern = rule.get('pattern')
-        if pattern and pattern.search(input_text):
-            threats.append({
-                'type': rule.get('type', 'custom'),
-                'pattern': str(pattern),
-                'score': rule.get('score', 50)
-            })
-            total_score += rule.get('score', 50)
-
-    risk_level = 'none'
-    if total_score >= threshold_critical:
-        risk_level = 'critical'
-    elif total_score >= threshold_high:
-        risk_level = 'high'
-    elif total_score >= threshold_medium:
-        risk_level = 'medium'
-    elif total_score > 0:
-        risk_level = 'low'
-
-    safe = total_score == 0
-
-    summary = (
-        "Input is safe" if safe
-        else f"Detected {len(threats)} threat(s) with total score {total_score}. Risk level: {risk_level}."
-    )
-
-    return {
-        'safe': safe,
-        'score': total_score,
-        'risk_level': risk_level,
-        'threats': threats,
-        'summary': summary
-    }
+    return PromptShield(options).detect_prompt_injection(input_text)
 
 
 def detect_jailbreak(input_text: str) -> Dict[str, Any]:
-    if not input_text:
-        return {'detected': False, 'score': 0, 'patterns': []}
-
-    total_score = 0
-    matched_patterns = []
-
-    for rule in JAILBREAK_PATTERNS:
-        if rule['pattern'].search(input_text):
-            total_score += rule['score']
-            matched_patterns.append(rule['label'])
-
-    detected = total_score >= 70
-
-    return {
-        'detected': detected,
-        'score': total_score,
-        'patterns': matched_patterns
-    }
+    return PromptShield().detect_jailbreak(input_text)
 
 
 def detect_prompt_leak(

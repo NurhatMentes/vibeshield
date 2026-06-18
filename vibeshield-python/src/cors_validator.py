@@ -40,10 +40,15 @@ def _is_wildcard(origin: str) -> bool:
 
 
 def _is_valid_origin_format(origin: str) -> bool:
-    if origin == '*':
+    # Exact origin
+    if re.match(r'^https?://[a-zA-Z0-9.-]+(:\d+)?$', origin):
         return True
-    pattern = r'^https?://[a-zA-Z0-9][a-zA-Z0-9\-.]*(:\d{1,5})?$'
-    return bool(re.match(pattern, origin))
+    
+    # Subdomain wildcard: *.example.com
+    if re.match(r'^\*\.[a-zA-Z0-9.-]+$', origin):
+        return True
+        
+    return False
 
 
 def _is_localhost_origin(origin: str) -> bool:
@@ -93,7 +98,7 @@ def validate_cors_config(config: Optional[dict] = None) -> dict:
     # 4. Origin Format Validation
     for origin in origins:
         if not _is_wildcard(origin) and not _is_valid_origin_format(origin):
-            errors.append(f'Invalid origin format: "{origin}". Origins must start with http:// or https://.')
+            errors.append(f'Invalid origin format: "{origin}". Expected: "https://example.com" or "*.example.com"')
 
     # 5. Localhost in Production
     if prod:

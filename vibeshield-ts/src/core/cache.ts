@@ -50,6 +50,12 @@ export class VibeShieldCache {
    * Stores a response in the cache. Clones the response to extract its body without blocking.
    */
   public async set(key: string, response: Response, ttlSeconds = this.defaultTtl): Promise<void> {
+    if (ttlSeconds !== undefined && ttlSeconds > 60) {
+      console.warn(
+        `[VibeShield Cache] TTL ${ttlSeconds}s exceeds maximum 60s. ` +
+        `Using 60s instead. For longer caching, consider Redis or external cache.`
+      );
+    }
     const finalTtl = Math.min(ttlSeconds, 60);
 
     // Prune any expired entries before checking capacity

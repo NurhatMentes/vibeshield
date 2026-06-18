@@ -103,6 +103,18 @@ class TestStackSanitizer:
         assert "postgres://" not in clean
         assert "s3cret" not in clean
 
+    def test_redacts_container_paths(self):
+        stack = 'Error at /app/src/index.py:10'
+        clean = sanitize_traceback(stack)
+        assert '[PROJECT_ROOT]/...' in clean
+        assert '/app/' not in clean
+
+    def test_redacts_kubernetes_paths(self):
+        stack = 'Error at /srv/app/dist/bundle.py:1'
+        clean = sanitize_traceback(stack)
+        assert '[PROJECT_ROOT]/...' in clean
+        assert '/srv/' not in clean
+
 
 # ==========================================
 # 2. ERROR HANDLER INTEGRATION TESTS

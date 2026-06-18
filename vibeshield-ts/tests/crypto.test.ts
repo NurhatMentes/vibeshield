@@ -80,4 +80,20 @@ describe('VibeShield Crypto Engine (TypeScript)', () => {
     expect(decryptedData.user.ssn).toBe('123-45-678');
     expect(decryptedData.unrelated).toBe('plain');
   });
+
+  it('should generate different keys/ciphertexts for different salts (HKDF)', () => {
+    const plainText = 'sensitive_credit_card_data';
+    const cipherText1 = encryptAES(plainText, secretKey);
+    const cipherText2 = encryptAES(plainText, secretKey);
+    
+    expect(cipherText1).not.toBe(cipherText2);
+    expect(decryptAES(cipherText1, secretKey)).toBe(plainText);
+    expect(decryptAES(cipherText2, secretKey)).toBe(plainText);
+  });
+
+  it('should support backward compatibility with old hex format', () => {
+    const oldCipherText = "gcm:c6c0606fc58701be32942917:9ff2c70aadfd38acb838e97fb07324ff:6319b2944d";
+    const decrypted = decryptAES(oldCipherText, "secret");
+    expect(decrypted).toBe("hello");
+  });
 });

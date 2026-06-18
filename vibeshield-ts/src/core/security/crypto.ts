@@ -34,43 +34,81 @@ export function verifyPassword(password: string, storedHash: string): boolean {
   }
 }
 
-// --- AES-256-GCM ENCRYPTION ---
+// --- AES-256-GCM ENCRYPTION WITH HKDF KEY DERIVATION ---
 
-function get32ByteKey(secret: string): Buffer {
-  return crypto.createHash('sha256').update(secret).digest();
+export function deriveKey(secret: string, salt?: Buffer): { key: Buffer; salt: Buffer } {
+  const actualSalt = salt || crypto.randomBytes(16);
+  const key = crypto.hkdfSync('sha256', secret, actualSalt, 'vibeshield-encryption-v1', 32);
+  return { key: Buffer.from(key), salt: actualSalt };
 }
 
 export function encryptAES(text: string, secret: string): string {
   if (typeof text !== 'string') text = JSON.stringify(text);
   
   const iv = crypto.randomBytes(12);
-  const key = get32ByteKey(secret);
+  const { key, salt } = deriveKey(secret);
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
   
-  let encrypted = cipher.update(text, 'utf8', 'hex');
-  encrypted += cipher.final('hex');
-  const authTag = cipher.getAuthTag().toString('hex');
+  let encrypted = cipher.update(text, 'utf8', 'base64');
+  encrypted += cipher.final('base64');
+  const authTag = cipher.getAuthTag().toString('base64');
   
-  return `gcm:${iv.toString('hex')}:${authTag}:${encrypted}`;
+  return `gcm:enc:${salt.toString('base64')}:${encrypted}:${iv.toString('base64')}:${authTag}`;
 }
 
 export function decryptAES(cipherText: string, secret: string): string {
   try {
+    if (typeof cipherText !== 'string') return cipherText;
+    if (!cipherText.startsWith('gcm:')) return cipherText;
+
     const parts = cipherText.split(':');
-    if (parts.length !== 4 || parts[0] !== 'gcm') return cipherText; // Fallback if not our format
     
-    const [, ivHex, authTagHex, encryptedHex] = parts;
-    const key = get32ByteKey(secret);
-    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
-    decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
+    // Support new format: gcm:enc:base64(salt):base64(ciphertext):base64(iv):base64(tag) -> length 6
+    if (parts.length === 6 && parts[0] === 'gcm' && parts[1] === 'enc') {
+      const salt = Buffer.from(parts[2], 'base64');
+      const encrypted = Buffer.from(parts[3], 'base64');
+      const iv = Buffer.from(parts[4], 'base64');
+      const authTag = Buffer.from(parts[5], 'base64');
+      
+      const { key } = deriveKey(secret, salt);
+      const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+      decipher.setAuthTag(authTag);
+      
+      let decrypted = decipher.update(encrypted);
+      decrypted += decipher.final();
+      return decrypted.toString('utf8');
+    }
     
-    let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
+    // Support old base64 format: gcm:enc:base64(ciphertext):base64(iv):base64(tag) -> length 5
+    if (parts.length === 5 && parts[0] === 'gcm' && parts[1] === 'enc') {
+      const encrypted = Buffer.from(parts[2], 'base64');
+      const iv = Buffer.from(parts[3], 'base64');
+      const authTag = Buffer.from(parts[4], 'base64');
+      
+      // Derive key using old sha256 method
+      const key = crypto.createHash('sha256').update(secret).digest();
+      const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+      decipher.setAuthTag(authTag);
+      
+      let decrypted = decipher.update(encrypted);
+      decrypted += decipher.final();
+      return decrypted.toString('utf8');
+    }
+
+    // Support old hex format: gcm:ivHex:authTagHex:encryptedHex -> length 4
+    if (parts.length === 4 && parts[0] === 'gcm') {
+      const [, ivHex, authTagHex, encryptedHex] = parts;
+      const key = crypto.createHash('sha256').update(secret).digest();
+      const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
+      decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
+      
+      let decrypted = decipher.update(encryptedHex, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+      return decrypted;
+    }
+    
+    return cipherText;
   } catch (e) {
-    // If decryption fails (e.g. tampered data), return original or throw? 
-    // In secure systems, tampering should fail hard, but for transparent proxies returning null/original is sometimes safer to avoid crashing. 
-    // We will return a masked error string to prevent leakage.
     return "[[DECRYPTION_FAILED]]";
   }
 }
@@ -93,13 +131,11 @@ export function processCryptoFields(
   for (const [key, value] of Object.entries(val)) {
     if (fields.includes(key)) {
       if (encrypt) {
-        // We encrypt the value as a JSON string if it's not a string
         const strVal = typeof value === 'string' ? value : JSON.stringify(value);
         result[key] = encryptAES(strVal, secret);
       } else {
         if (typeof value === 'string' && value.startsWith('gcm:')) {
           const decrypted = decryptAES(value, secret);
-          // Try to parse JSON back if it was an object/number
           try {
             result[key] = JSON.parse(decrypted);
           } catch {

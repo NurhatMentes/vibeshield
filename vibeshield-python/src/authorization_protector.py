@@ -7,7 +7,7 @@ class VibeShieldAuthorizationError(ValueError):
         super().__init__(f"[VibeShield] Authorization Protection: {message}")
         self.message = message
 
-PERMISSION_MATRIX = {
+DEFAULT_PERMISSION_MATRIX = {
     "admin": {
         "users": ["read", "write", "delete", "admin"],
         "posts": ["read", "write", "delete", "admin"],
@@ -19,27 +19,50 @@ PERMISSION_MATRIX = {
         "settings": ["read"]
     },
     "guest": {
-        "users": [],
-        "posts": ["read"],
-        "settings": []
+        "posts": ["read"]
     }
 }
 
-def check_permission(user: Dict[str, Any], resource: str, action: str) -> bool:
-    role = user.get("role")
+PERMISSION_MATRIX = DEFAULT_PERMISSION_MATRIX
+
+def create_permission_matrix(custom_matrix: Dict[str, Any]) -> Dict[str, Any]:
+    merged = {}
+    for role, resources in DEFAULT_PERMISSION_MATRIX.items():
+        merged[role] = dict(resources)
+    
+    for role, resources in custom_matrix.items():
+        if role not in merged:
+            merged[role] = {}
+        merged[role].update(resources)
+        
+    return merged
+
+def check_permission(
+    user_or_role: Union[Dict[str, Any], str],
+    resource: str,
+    action: str,
+    matrix: Dict[str, Any] = DEFAULT_PERMISSION_MATRIX
+) -> bool:
+    if isinstance(user_or_role, dict):
+        role = user_or_role.get("role")
+        user_permissions = user_or_role.get("permissions", [])
+    else:
+        role = user_or_role
+        user_permissions = []
+
     if role == "admin":
         return True
 
-    user_permissions = user.get("permissions", [])
-    direct_perm = f"{resource}:{action}"
-    direct_wildcard = f"{resource}:*"
-    if direct_perm in user_permissions or direct_wildcard in user_permissions or "*:*" in user_permissions:
-        return True
+    if user_permissions:
+        direct_perm = f"{resource}:{action}"
+        direct_wildcard = f"{resource}:*"
+        if direct_perm in user_permissions or direct_wildcard in user_permissions or "*:*" in user_permissions:
+            return True
 
-    role_matrix = PERMISSION_MATRIX.get(role)
+    role_matrix = matrix.get(role)
     if role_matrix and resource in role_matrix:
         allowed_actions = role_matrix[resource]
-        if action in allowed_actions:
+        if action in allowed_actions or "admin" in allowed_actions:
             return True
 
     return False

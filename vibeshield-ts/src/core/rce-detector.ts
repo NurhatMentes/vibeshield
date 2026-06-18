@@ -215,21 +215,32 @@ function maskOriginalCode(line: string): string {
  * @param args - The arguments string.
  * @returns True if the argument is dynamic, false otherwise.
  */
-function isDynamic(args: string): boolean {
+export function isDynamic(args: string): boolean {
   const trimmed = args.trim();
   if (!trimmed) return false;
-  // If it's a simple single string literal, e.g. "foo", 'foo', `foo`
-  // After masking, the contents inside quotes are just spaces.
-  // Check if it matches exactly a single quoted/backticked string consisting only of spaces/empty
-  const staticPattern = /^(['"`])\s*\1$/;
-  if (staticPattern.test(trimmed)) return false;
-  // If it contains a plus sign outside quotes or a variable, it is dynamic.
-  // In masked code, any non-space/non-operator word character outside quotes indicates a variable.
-  // We can check if there are variable names or interpolation syntax
-  if (trimmed.includes('+') || trimmed.includes('${')) return true;
+
+  // Replace all string literals with empty string to avoid analyzing their content,
+  // but keep template literals containing interpolation so they are detected.
+  const noStrings = trimmed
+    .replace(/(["'])(?:(?=(\\?))\2.)*?\1/g, '')
+    .replace(/`[^`]*`/g, (match) => {
+      if (match.includes('${')) {
+        return match;
+      }
+      return '';
+    });
+
+  const stripped = noStrings.trim();
+  if (!stripped) return false;
+
+  if (stripped.includes('+') || stripped.includes('${')) return true;
+
+  // Remove keywords/booleans/null/undefined
+  const clean = stripped.replace(/\b(true|false|null|undefined)\b/g, '');
+
   // Check for any unquoted identifier word character (excluding numeric constants)
-  const clean = trimmed.replace(/['"`]\s*['"`]/g, '');
   if (/[a-zA-Z_$][a-zA-Z0-9_$]*/.test(clean)) return true;
+
   return false;
 }
 

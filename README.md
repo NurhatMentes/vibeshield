@@ -34,6 +34,45 @@ Modern AI coding assistants (Cursor, Claude, GitHub Copilot, Windsurf) can gener
 
 ---
 
+## 🎯 Hidden Gems — Features You Won't Find Elsewhere
+
+VibeShield includes advanced security features rarely found in competing libraries:
+
+### 🔐 HKDF Key Derivation
+Unlike libraries that use direct SHA-256 hashing, VibeShield uses **HKDF (HMAC-based Key Derivation Function)** with random salt for encryption keys. This prevents brute-force attacks and ensures each encryption uses a unique key.
+
+### 🕵️ Canary Token Prompt Leak Detection
+Detect when AI models leak system prompts by injecting **canary tokens** into prompts. If the canary appears in the response, you know the prompt was leaked.
+
+```typescript
+const shield = new PromptShield({ canaryToken: 'SECRET_CANARY_12345' });
+const result = shield.checkLeakage(response, 'SECRET_CANARY_12345');
+if (result.leaked) {
+  console.error('⚠️ Prompt leak detected!');
+}
+```
+
+### ⏱️ Timing-Safe HMAC Comparison
+Prevent timing attacks with constant-time HMAC comparison. Unlike `===` comparison, this prevents attackers from guessing tokens based on response time differences.
+
+### 📊 Nanosecond Performance Monitoring
+Track endpoint performance with nanosecond precision using `process.hrtime.bigint()`. Identify slow endpoints before they impact users.
+
+### 💸 Financial Circuit-Breaker
+Automatically stop runaway AI costs with VibeBudgeter. Set daily spending limits and get alerts before you exceed them.
+
+```typescript
+budget: {
+  enabled: true,
+  maxDailyCost: 10.00, // USD
+  alertThreshold: 0.80 // Alert at 80% of budget
+}
+```
+
+These features are typically found only in enterprise security platforms, now available in a zero-dependency, open-source package.
+
+---
+
 ## ✨ Why VibeShield?
 
 - 🛡️ **15 Security Modules** — Comprehensive protection across all attack vectors
@@ -194,6 +233,28 @@ Blocks insecure CORS configurations AI assistants commonly produce:
 - 🚫 Sensitive headers exposed (`Authorization`, `Set-Cookie`)
 - 🚫 Dangerous HTTP methods (`TRACE`, `CONNECT`)
 
+**Subdomain wildcards:**
+```typescript
+cors: {
+  origins: ['https://example.com', '*.example.com'] // Allows all subdomains
+}
+```
+
+#### 💉 SQL Injection Mitigation (Defense-in-Depth)
+
+VibeShield provides **partial mitigation** through input sanitization, but this is NOT a substitute for proper database security practices.
+
+**✅ ALWAYS use:**
+- Parameterized queries (prepared statements)
+- ORM query builders (Prisma, TypeORM, Sequelize)
+- Input validation with allowlists
+
+**❌ NEVER rely solely on:**
+- String concatenation in SQL queries
+- Input sanitization as primary defense
+
+VibeShield's sanitization is a **secondary layer** that helps catch missed vulnerabilities, not a primary defense mechanism.
+
 ---
 
 ### ⚔️ Phase 2 — Critical Runtime Protection
@@ -243,6 +304,26 @@ Zero-dependency recursive validation engine with **whitelist-only** property ret
 - 🎯 Unknown field rejection (strict mode)
 - 🎯 Path-based error reporting: `user.profile.email`
 
+### Input Validation
+
+**POST/PUT/PATCH:** Validates request body
+**GET:** Validates query parameters
+
+```typescript
+// GET /api/users?page=1&limit=10
+export const GET = vibeShield(async (req) => {
+  const url = new URL(req.url);
+  const page = parseInt(url.searchParams.get('page') || '1');
+  const limit = parseInt(url.searchParams.get('limit') || '10');
+  // ...
+}, {
+  validationSchema: {
+    page: { type: 'number', min: 1 },
+    limit: { type: 'number', min: 1, max: 100 }
+  }
+});
+```
+
 ---
 
 ### 🏰 Phase 4 — Application-Level Security
@@ -254,6 +335,24 @@ Complete RBAC + IDOR protection with **static code analysis**:
 - 🛡️ **IDOR Protection:** Validates resource ownership automatically
 - 🔍 **Static Analyzer:** Scans routes for missing auth middleware
 - 🎭 **Decorators/Middleware:** `@require_role`, `@require_permission`, `@require_ownership`
+
+**Custom permission matrix:**
+```typescript
+import { createPermissionMatrix, checkPermission } from '@vibeshield/core';
+
+const customMatrix = createPermissionMatrix({
+  moderator: {
+    posts: ['read', 'write', 'delete'],
+    comments: ['read', 'write', 'delete'],
+  },
+  editor: {
+    posts: ['read', 'write'],
+  },
+});
+
+// Check permission
+const canDelete = checkPermission('moderator', 'posts', 'delete', customMatrix);
+```
 
 #### 🔒 Weak Password Policy Protector
 Enterprise password validation with **embedded blacklist** of top 200 common passwords.
@@ -270,6 +369,33 @@ Enterprise password validation with **embedded blacklist** of top 200 common pas
 
 #### 🛡️ Prompt Injection Mitigation (Prompt Shield)
 Detects and blocks OWASP #1 LLM vulnerability: Prompt Injection, Jailbreaking, and Prompt Leaking using zero-dependency heuristic scoring. Automatically injects canary tokens for leak detection.
+
+### Custom Jailbreak Patterns
+
+Extend VibeShield's detection with your own patterns:
+
+```typescript
+import { PromptShield } from '@vibeshield/core';
+
+const shield = new PromptShield({
+  customPatterns: {
+    direct: [
+      'bypass all restrictions',
+      'act as unrestricted AI',
+    ],
+    jailbreak: [
+      'DAN mode activated',
+      'developer mode enabled',
+    ],
+  },
+});
+
+// Or add patterns dynamically
+shield.addPatterns('jailbreak', ['new jailbreak pattern']);
+```
+
+Stay updated:
+New jailbreak patterns emerge monthly. Extend the default patterns with community-discovered patterns to stay protected.
 
 ##### TypeScript Example
 ```typescript
@@ -320,6 +446,30 @@ def chat_endpoint():
 ---
 
 ## ⚡ Performance Benchmarks
+
+**Test Environment:**
+- Node.js 20.x, macOS M2 (8-core)
+- 1000 requests, 10 concurrent connections
+- Cold start: First request after server restart
+- Warm cache: Subsequent requests with cache hits
+
+**Methodology:**
+```bash
+# Run benchmark
+cd scripts
+node benchmark.js
+
+# Results:
+# Without VibeShield: 9.23 ms/req (avg)
+# With VibeShield (cache hit): 0.13 ms/req (avg)
+# Improvement: 70.7x faster
+```
+
+Why faster?
+- LRU cache eliminates redundant computations
+- Early validation rejects invalid requests before expensive operations
+- Optimized middleware chain reduces overhead
+- Benchmark script: `scripts/benchmark.js`
 
 ### TypeScript (Next.js)
 
@@ -381,6 +531,25 @@ performanceThresholdMs: 200
 // ⚠️ [VIBESHIELD PERFORMANCE WARNING]
 // Route: POST /api/heavy-calculation
 // Duration: 558 ms (threshold exceeded)
+```
+
+### ⚡ High-Performance LRU Cache
+
+VibeShield includes a high-performance in-memory LRU cache to accelerate response times and minimize database query load.
+
+**Cache Key Strategy:**
+By default, cache keys include method, path, and sorted query parameters. For APIs where query parameter order matters, this prevents cache poisoning.
+
+**TTL Limit:**
+Maximum TTL is 60 seconds (in-memory LRU cache). For longer caching, use Redis or external cache solutions.
+
+**Custom key generator:**
+```typescript
+cache: {
+  enabled: true,
+  ttl: 60, // Max 60 seconds
+  keyGenerator: (req) => `${req.method}:${req.url}` // Your custom logic
+}
 ```
 
 ---

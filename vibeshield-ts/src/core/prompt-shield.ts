@@ -96,122 +96,203 @@ export function generateCanaryToken(): string {
   return `CANARY_VIBESHIELD_${randomHex}`;
 }
 
+export interface PatternItem {
+  pattern: RegExp;
+  score: number;
+  label: string;
+}
+
+export interface InjectionPatterns {
+  direct: PatternItem[];
+  jailbreak: PatternItem[];
+  leaking: PatternItem[];
+  virtualization: PatternItem[];
+  indirect: PatternItem[];
+}
+
+function toPatternItem(p: string | PatternItem, defaultType: string): PatternItem {
+  if (typeof p === 'string') {
+    const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return {
+      pattern: new RegExp(escaped, 'i'),
+      score: 80,
+      label: p
+    };
+  }
+  return p;
+}
+
+export class PromptShield {
+  private patterns: InjectionPatterns;
+  private options: PromptShieldOptions;
+
+  constructor(options: PromptShieldOptions = {}) {
+    this.options = options;
+    const custom = options.customPatterns && !Array.isArray(options.customPatterns) ? options.customPatterns : {};
+    
+    this.patterns = {
+      direct: [
+        ...DIRECT_INJECTION_PATTERNS,
+        ...((custom as any).direct || []).map((p: any) => toPatternItem(p, 'direct'))
+      ],
+      jailbreak: [
+        ...JAILBREAK_PATTERNS,
+        ...((custom as any).jailbreak || []).map((p: any) => toPatternItem(p, 'jailbreak'))
+      ],
+      leaking: [
+        ...PROMPT_LEAK_PATTERNS,
+        ...((custom as any).leaking || []).map((p: any) => toPatternItem(p, 'leaking'))
+      ],
+      virtualization: [
+        ...VIRTUALIZATION_PATTERNS,
+        ...((custom as any).virtualization || []).map((p: any) => toPatternItem(p, 'virtualization'))
+      ],
+      indirect: [
+        ...INDIRECT_INJECTION_PATTERNS,
+        ...((custom as any).indirect || []).map((p: any) => toPatternItem(p, 'indirect'))
+      ]
+    };
+  }
+
+  public addPatterns(category: keyof InjectionPatterns, newPatterns: Array<string | PatternItem>): void {
+    if (!this.patterns[category]) {
+      this.patterns[category] = [];
+    }
+    const items = newPatterns.map(p => toPatternItem(p, category));
+    this.patterns[category].push(...items);
+  }
+
+  public removePatterns(category: keyof InjectionPatterns, patternsToRemove: string[]): void {
+    if (!this.patterns[category]) return;
+    this.patterns[category] = this.patterns[category].filter(
+      p => !patternsToRemove.includes(p.label)
+    );
+  }
+
+  public detectPromptInjection(input: string): PromptShieldResult {
+    if (!input) {
+      return {
+        safe: true,
+        score: 0,
+        riskLevel: 'none',
+        threats: [],
+        summary: 'Input is empty',
+      };
+    }
+
+    const thresholdMedium = this.options.thresholdMedium ?? 50;
+    const thresholdHigh = this.options.thresholdHigh ?? 100;
+    const thresholdCritical = this.options.thresholdCritical ?? 150;
+
+    const threats: Array<{ type: string; pattern: string; score: number }> = [];
+    let totalScore = 0;
+
+    const scanList = [
+      { list: this.patterns.direct, type: 'direct_injection' },
+      { list: this.patterns.jailbreak, type: 'jailbreak' },
+      { list: this.patterns.leaking, type: 'prompt_leak' },
+      { list: this.patterns.virtualization, type: 'virtualization' },
+      { list: this.patterns.indirect, type: 'indirect_injection' },
+    ];
+
+    for (const item of scanList) {
+      for (const rule of item.list) {
+        if (rule.pattern.test(input)) {
+          // Exclude false positives for benign lookups
+          if (
+            item.type === 'direct_injection' &&
+            rule.label === 'Ignore previous instructions' &&
+            /\b(how|why|error|code|python|typescript|javascript|git|compile)\b/i.test(input) &&
+            /\b(in|to|with)\b/i.test(input)
+          ) {
+            continue;
+          }
+
+          threats.push({
+            type: item.type,
+            pattern: rule.label,
+            score: rule.score,
+          });
+          totalScore += rule.score;
+        }
+      }
+    }
+
+    if (this.options.customPatterns && Array.isArray(this.options.customPatterns)) {
+      for (const rule of this.options.customPatterns) {
+        if (rule.pattern.test(input)) {
+          threats.push({
+            type: rule.type,
+            pattern: rule.pattern.toString(),
+            score: rule.score,
+          });
+          totalScore += rule.score;
+        }
+      }
+    }
+
+    let riskLevel: 'none' | 'low' | 'medium' | 'high' | 'critical' = 'none';
+    if (totalScore >= thresholdCritical) {
+      riskLevel = 'critical';
+    } else if (totalScore >= thresholdHigh) {
+      riskLevel = 'high';
+    } else if (totalScore >= thresholdMedium) {
+      riskLevel = 'medium';
+    } else if (totalScore > 0) {
+      riskLevel = 'low';
+    }
+
+    const safe = totalScore === 0;
+
+    const summary = safe
+      ? 'Input is safe'
+      : `Detected ${threats.length} threat(s) with total score ${totalScore}. Risk level: ${riskLevel}.`;
+
+    return {
+      safe,
+      score: totalScore,
+      riskLevel,
+      threats,
+      summary,
+    };
+  }
+
+  public detectJailbreak(input: string): { detected: boolean; score: number; patterns: string[] } {
+    if (!input) {
+      return { detected: false, score: 0, patterns: [] };
+    }
+
+    let totalScore = 0;
+    const matchedPatterns: string[] = [];
+
+    for (const rule of this.patterns.jailbreak) {
+      if (rule.pattern.test(input)) {
+        totalScore += rule.score;
+        matchedPatterns.push(rule.label);
+      }
+    }
+
+    const detected = totalScore >= 70;
+
+    return {
+      detected,
+      score: totalScore,
+      patterns: matchedPatterns,
+    };
+  }
+}
+
 export function detectPromptInjection(
   input: string,
   options?: PromptShieldOptions
 ): PromptShieldResult {
-  if (!input) {
-    return {
-      safe: true,
-      score: 0,
-      riskLevel: 'none',
-      threats: [],
-      summary: 'Input is empty',
-    };
-  }
-
-  const thresholdMedium = options?.thresholdMedium ?? 50;
-  const thresholdHigh = options?.thresholdHigh ?? 100;
-  const thresholdCritical = options?.thresholdCritical ?? 150;
-
-  const threats: Array<{ type: string; pattern: string; score: number }> = [];
-  let totalScore = 0;
-
-  const scanList = [
-    { list: DIRECT_INJECTION_PATTERNS, type: 'direct_injection' },
-    { list: JAILBREAK_PATTERNS, type: 'jailbreak' },
-    { list: PROMPT_LEAK_PATTERNS, type: 'prompt_leak' },
-    { list: VIRTUALIZATION_PATTERNS, type: 'virtualization' },
-    { list: INDIRECT_INJECTION_PATTERNS, type: 'indirect_injection' },
-  ];
-
-  for (const item of scanList) {
-    for (const rule of item.list) {
-      if (rule.pattern.test(input)) {
-        // Exclude false positives for benign lookups
-        if (
-          item.type === 'direct_injection' &&
-          rule.label === 'Ignore previous instructions' &&
-          /\b(how|why|error|code|python|typescript|javascript|git|compile)\b/i.test(input) &&
-          /\b(in|to|with)\b/i.test(input)
-        ) {
-          continue;
-        }
-
-        threats.push({
-          type: item.type,
-          pattern: rule.label,
-          score: rule.score,
-        });
-        totalScore += rule.score;
-      }
-    }
-  }
-
-  if (options?.customPatterns) {
-    for (const rule of options.customPatterns) {
-      if (rule.pattern.test(input)) {
-        threats.push({
-          type: rule.type,
-          pattern: rule.pattern.toString(),
-          score: rule.score,
-        });
-        totalScore += rule.score;
-      }
-    }
-  }
-
-  let riskLevel: 'none' | 'low' | 'medium' | 'high' | 'critical' = 'none';
-  if (totalScore >= thresholdCritical) {
-    riskLevel = 'critical';
-  } else if (totalScore >= thresholdHigh) {
-    riskLevel = 'high';
-  } else if (totalScore >= thresholdMedium) {
-    riskLevel = 'medium';
-  } else if (totalScore > 0) {
-    riskLevel = 'low';
-  }
-
-  const safe = totalScore === 0;
-
-  const summary = safe
-    ? 'Input is safe'
-    : `Detected ${threats.length} threat(s) with total score ${totalScore}. Risk level: ${riskLevel}.`;
-
-  return {
-    safe,
-    score: totalScore,
-    riskLevel,
-    threats,
-    summary,
-  };
+  return new PromptShield(options).detectPromptInjection(input);
 }
 
 export function detectJailbreak(
   input: string
 ): { detected: boolean; score: number; patterns: string[] } {
-  if (!input) {
-    return { detected: false, score: 0, patterns: [] };
-  }
-
-  let totalScore = 0;
-  const matchedPatterns: string[] = [];
-
-  for (const rule of JAILBREAK_PATTERNS) {
-    if (rule.pattern.test(input)) {
-      totalScore += rule.score;
-      matchedPatterns.push(rule.label);
-    }
-  }
-
-  // A lower threshold for jailbreaks specifically
-  const detected = totalScore >= 70;
-
-  return {
-    detected,
-    score: totalScore,
-    patterns: matchedPatterns,
-  };
+  return new PromptShield().detectJailbreak(input);
 }
 
 export function detectPromptLeak(

@@ -377,21 +377,36 @@ def _is_dynamic(args: str) -> bool:
     trimmed = args.strip()
     if not trimmed:
         return False
-    # If it is a simple single string literal (after masking, has space or empty inside matching quotes)
-    static_patterns = [
-        r"^(['\"])\s*\1$",
-        r"^([\"']{3})\s*\1$"
-    ]
-    if any(re.match(p, trimmed) for p in static_patterns):
+
+    # Strip f-string / raw / byte string prefixes (like f, r, b) before quotes
+    normalized = re.sub(r'\b[fFrRbBuU]+(?=["\'])', '', trimmed)
+
+    # Replace all string literals (including triple-quoted) with empty string,
+    # but keep ones containing interpolation braces or formatting so they are detected.
+    def repl_string(match):
+        val = match.group(0)
+        if '{' in val or '%' in val:
+            return val
+        return ''
+
+    no_strings = re.sub(r'(""")[\s\S]*?\1', repl_string, normalized)
+    no_strings = re.sub(r"('''" + r")[\s\S]*?\1", repl_string, no_strings)
+    no_strings = re.sub(r'("[^"\\]*(?:\\.[^"\\]*)*")', repl_string, no_strings)
+    no_strings = re.sub(r"('[^'\\]*(?:\\.[^'\\]*)*')", repl_string, no_strings)
+
+    stripped = no_strings.strip()
+    if not stripped:
         return False
-    # If it contains variable lookup, format operations or concatenations
-    if '+' in trimmed or '{' in trimmed or '%' in trimmed:
+
+    if '+' in stripped or '{' in stripped or '%' in stripped:
         return True
-    # Strip quotes
-    clean = re.sub(r'([\'"])\s*\1', '', trimmed)
-    clean = re.sub(r'([\'"]{3})\s*\1', '', clean)
+
+    # Remove keywords/booleans/None
+    clean = re.sub(r'\b(True|False|None)\b', '', stripped)
+
     if re.search(r'[a-zA-Z_][a-zA-Z0-9_]*', clean):
         return True
+
     return False
 
 

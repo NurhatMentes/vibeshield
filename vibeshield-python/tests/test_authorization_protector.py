@@ -436,3 +436,25 @@ def test_require_auth_invalid_permission_format():
     with pytest.raises(VibeShieldAuthorizationError) as exc_info:
         test_view(user={"role": "user"})
     assert "Invalid permission format" in str(exc_info.value)
+
+def test_create_permission_matrix():
+    from src.authorization_protector import create_permission_matrix
+    custom = create_permission_matrix({
+        "moderator": {
+            "posts": ["read", "write", "delete"]
+        }
+    })
+    assert "moderator" in custom
+    assert custom["moderator"]["posts"] == ["read", "write", "delete"]
+    assert "delete" in custom["admin"]["users"]
+
+def test_check_permission_custom_matrix():
+    from src.authorization_protector import create_permission_matrix, check_permission
+    custom = create_permission_matrix({
+        "moderator": {
+            "posts": ["read", "write", "delete"]
+        }
+    })
+    assert check_permission("moderator", "posts", "delete", custom) is True
+    assert check_permission("moderator", "users", "read", custom) is False
+    assert check_permission("user", "posts", "write", custom) is True

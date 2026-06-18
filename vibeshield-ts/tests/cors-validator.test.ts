@@ -382,4 +382,22 @@ describe('CORS Security Enforcement', () => {
     expect(warnCalls).toContain('CORS Security Warnings');
     expect(warnCalls).toContain('Tip');
   });
+
+  describe('Wildcard Subdomain Support', () => {
+    it('should allow subdomain wildcards', () => {
+      const result = validateCorsConfig({
+        allowedOrigins: ['https://example.com', '*.example.com'],
+      });
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+    });
+
+    it('should reject invalid subdomain wildcards', () => {
+      const result = validateCorsConfig({
+        allowedOrigins: ['*example.com'],
+      });
+      expect(result.valid).toBe(false);
+      expect(result.errors[0]).toContain('Expected: "https://example.com" or "*.example.com"');
+    });
+  });
 });

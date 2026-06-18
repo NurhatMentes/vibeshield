@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { detectRcePatterns } from '../src/core/rce-detector.js';
+import { detectRcePatterns, isDynamic } from '../src/core/rce-detector.js';
 
 describe('RCE Pattern Detector', () => {
   // ── EVAL TESTS ────────────────────────────────────────────────────────
@@ -315,6 +315,30 @@ describe('RCE Pattern Detector', () => {
       expect(result.findings[0].severity).toBe('high');
       expect(result.findings[1].line).toBe(5);
       expect(result.findings[1].severity).toBe('critical');
+    });
+  });
+
+  describe('isDynamic helper', () => {
+    it('should not flag numeric literals', () => {
+      expect(isDynamic('1000')).toBe(false);
+      expect(isDynamic('3.14')).toBe(false);
+    });
+
+    it('should not flag string literals', () => {
+      expect(isDynamic('"hello"')).toBe(false);
+      expect(isDynamic("'world'")).toBe(false);
+      expect(isDynamic('`template`')).toBe(false);
+    });
+
+    it('should not flag booleans and null', () => {
+      expect(isDynamic('true')).toBe(false);
+      expect(isDynamic('false')).toBe(false);
+      expect(isDynamic('null')).toBe(false);
+    });
+
+    it('should flag variables and operations', () => {
+      expect(isDynamic('a + b')).toBe(true);
+      expect(isDynamic('myVar')).toBe(true);
     });
   });
 });

@@ -48,3 +48,10 @@ def test_cache_clear():
     assert cache.size() == 2
     cache.clear()
     assert cache.size() == 0
+
+def test_cache_ttl_warning(capsys):
+    cache = VibeShieldCache(max_size=3, default_ttl=5.0)
+    cache.set("key1", "val1", ttl=70.0)
+    
+    captured = capsys.readouterr()
+    assert "[VibeShield Cache] TTL 70.0s exceeds maximum 60s." in captured.err

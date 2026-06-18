@@ -25,50 +25,84 @@ export interface DetectionResult {
   findings: Finding[];
 }
 
-export const PERMISSION_MATRIX = {
+export interface PermissionMatrix {
+  [role: string]: {
+    [resource: string]: string[];
+  };
+}
+
+export const DEFAULT_PERMISSION_MATRIX: PermissionMatrix = {
   admin: {
     users: ['read', 'write', 'delete', 'admin'],
     posts: ['read', 'write', 'delete', 'admin'],
-    settings: ['read', 'write', 'admin']
+    settings: ['read', 'write', 'admin'],
   },
   user: {
     users: ['read'],
     posts: ['read', 'write'],
-    settings: ['read']
+    settings: ['read'],
   },
   guest: {
-    users: [],
     posts: ['read'],
-    settings: []
-  }
+  },
 };
 
-export function checkPermission(
-  user: UserContext,
-  resource: string,
-  action: 'read' | 'write' | 'delete' | 'admin'
-): boolean {
-  if (user.role === 'admin') return true;
+export const PERMISSION_MATRIX = DEFAULT_PERMISSION_MATRIX;
 
-  const directPerm = `${resource}:${action}`;
-  const directWildcard = `${resource}:*`;
-  if (
-    user.permissions.includes(directPerm) ||
-    user.permissions.includes(directWildcard) ||
-    user.permissions.includes('*:*')
-  ) {
-    return true;
+export function createPermissionMatrix(customMatrix: PermissionMatrix): PermissionMatrix {
+  const merged: PermissionMatrix = {};
+  
+  for (const [role, resources] of Object.entries(DEFAULT_PERMISSION_MATRIX)) {
+    merged[role] = { ...resources };
+  }
+  
+  for (const [role, resources] of Object.entries(customMatrix)) {
+    merged[role] = {
+      ...(merged[role] || {}),
+      ...resources,
+    };
+  }
+  
+  return merged;
+}
+
+export function checkPermission(
+  userOrRole: UserContext | string,
+  resource: string,
+  action: string,
+  matrix: PermissionMatrix = DEFAULT_PERMISSION_MATRIX
+): boolean {
+  let userRole: string;
+  let permissions: string[] = [];
+
+  if (typeof userOrRole === 'object' && userOrRole !== null) {
+    userRole = userOrRole.role;
+    permissions = userOrRole.permissions || [];
+  } else {
+    userRole = userOrRole;
   }
 
-  const roleMatrix = PERMISSION_MATRIX[user.role];
-  if (roleMatrix && (roleMatrix as any)[resource]) {
-    const allowedActions = (roleMatrix as any)[resource];
-    if (allowedActions.includes(action)) {
+  if (userRole === 'admin') return true;
+
+  if (permissions.length > 0) {
+    const directPerm = `${resource}:${action}`;
+    const directWildcard = `${resource}:*`;
+    if (
+      permissions.includes(directPerm) ||
+      permissions.includes(directWildcard) ||
+      permissions.includes('*:*')
+    ) {
       return true;
     }
   }
 
-  return false;
+  const rolePermissions = matrix[userRole];
+  if (!rolePermissions) return false;
+  
+  const resourcePermissions = rolePermissions[resource];
+  if (!resourcePermissions) return false;
+  
+  return resourcePermissions.includes(action) || resourcePermissions.includes('admin');
 }
 
 export function validateResourceOwnership(

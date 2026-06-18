@@ -46,7 +46,7 @@ _PATTERNS: list[tuple[re.Pattern, str]] = [
 
     # Absolute Unix/macOS file paths
     (
-        re.compile(r"/(?:Users|home|var|tmp|opt|etc|root)/[^\s'\",)}\]:]+"),
+        re.compile(r"/(?:Users|home|var|tmp|opt|etc|root|app|srv|proc|run|usr/src|workspace|project)/[^\s'\",)}\]:]+"),
         MARKERS["PROJECT_ROOT"],
     ),
 

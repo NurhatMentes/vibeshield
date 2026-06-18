@@ -55,10 +55,17 @@ function isWildcard(origin: string): boolean {
 }
 
 function isValidOriginFormat(origin: string): boolean {
-  if (origin === '*') return true;
-  // Must start with http:// or https://
-  const pattern = /^https?:\/\/[a-zA-Z0-9][a-zA-Z0-9\-.]*(:\d{1,5})?$/;
-  return pattern.test(origin);
+  // Exact origin
+  if (/^https?:\/\/[a-zA-Z0-9.-]+(:\d+)?$/.test(origin)) {
+    return true;
+  }
+  
+  // Subdomain wildcard: *.example.com
+  if (/^\*\.[a-zA-Z0-9.-]+$/.test(origin)) {
+    return true;
+  }
+  
+  return false;
 }
 
 function isLocalhostOrigin(origin: string): boolean {
@@ -103,7 +110,7 @@ export function validateCorsConfig(config: CorsConfig): CorsValidationResult {
   // 4. Origin Format Validation
   for (const origin of origins) {
     if (!isWildcard(origin) && !isValidOriginFormat(origin)) {
-      errors.push(`Invalid origin format: "${origin}". Origins must start with http:// or https://.`);
+      errors.push(`Invalid origin format: "${origin}". Expected: "https://example.com" or "*.example.com"`);
     }
   }
 

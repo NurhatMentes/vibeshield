@@ -72,3 +72,17 @@ def test_recursive_field_decryption():
     
     assert decrypted_data["user"]["ssn"] == "123-45-678"
     assert decrypted_data["unrelated"] == "plain"
+
+def test_aes_gcm_hkdf_uniqueness():
+    plain_text = "sensitive_credit_card_data"
+    cipher_text_1 = encrypt_aes(plain_text, SECRET_KEY)
+    cipher_text_2 = encrypt_aes(plain_text, SECRET_KEY)
+    
+    assert cipher_text_1 != cipher_text_2
+    assert decrypt_aes(cipher_text_1, SECRET_KEY) == plain_text
+    assert decrypt_aes(cipher_text_2, SECRET_KEY) == plain_text
+
+def test_aes_gcm_backward_compatibility():
+    old_cipher_text = "gcm:c6c0606fc58701be32942917:9ff2c70aadfd38acb838e97fb07324ff:6319b2944d"
+    decrypted = decrypt_aes(old_cipher_text, "secret")
+    assert decrypted == "hello"

@@ -13,6 +13,15 @@ from .logging import start_audit_timer, end_audit_timer, log_audit, log_performa
 # Global cache instance
 global_cache = VibeShieldCache()
 
+def default_key_generator(method: str, path: str, query_string: str) -> str:
+    """Sort query parameters alphabetically for consistent cache keys."""
+    if not query_string:
+        return f"{method}:{path}"
+    pairs = parse_qsl(query_string, keep_blank_values=True)
+    sorted_pairs = sorted(pairs, key=lambda x: (x[0], x[1]))
+    sorted_params = "&".join(f"{k}={v}" for k, v in sorted_pairs)
+    return f"{method}:{path}?{sorted_params}"
+
 class VibeShieldASGIMiddleware:
     """
     ASGI Middleware for FastAPI / Starlette.
@@ -53,14 +62,15 @@ class VibeShieldASGIMiddleware:
         
         cache_key = None
         if self.cache_enabled and method == "GET":
+            current_query = scope.get("query_string", b"").decode("utf-8")
             if self.key_generator:
                 try:
-                    req_proxy = {"method": method, "path": path, "query_string": query_string}
+                    req_proxy = {"method": method, "path": path, "query_string": current_query}
                     cache_key = self.key_generator(req_proxy)
                 except Exception:
-                    cache_key = f"{method}:{path}?{query_string}"
+                    cache_key = default_key_generator(method, path, current_query)
             else:
-                cache_key = f"{method}:{path}?{query_string}"
+                cache_key = default_key_generator(method, path, current_query)
 
             cached = global_cache.get(cache_key)
             if cached:
@@ -268,14 +278,15 @@ class VibeShieldWSGIMiddleware:
         # 2. Check Cache for GET requests
         cache_key = None
         if self.cache_enabled and method == "GET":
+            current_query = environ.get("QUERY_STRING", "")
             if self.key_generator:
                 try:
-                    req_proxy = {"method": method, "path": path, "query_string": query_string}
+                    req_proxy = {"method": method, "path": path, "query_string": current_query}
                     cache_key = self.key_generator(req_proxy)
                 except Exception:
-                    cache_key = f"{method}:{path}?{query_string}"
+                    cache_key = default_key_generator(method, path, current_query)
             else:
-                cache_key = f"{method}:{path}?{query_string}"
+                cache_key = default_key_generator(method, path, current_query)
 
             cached = global_cache.get(cache_key)
             if cached:
