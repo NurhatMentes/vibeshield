@@ -65,6 +65,33 @@ pip install vibeshield-core
 poetry add vibeshield-core
 ```
 
+### Python Development Setup
+
+Since the package is not yet published to PyPI, clone the repository and install dependencies:
+
+```bash
+git clone https://github.com/NurhatMentes/vibeshield.git
+cd vibeshield/vibeshield-python
+
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements-dev.txt
+```
+
+**requirements-dev.txt:**
+```
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+fastapi>=0.100.0
+flask>=2.0.0
+httpx>=0.24.0
+uvicorn>=0.20.0
+cryptography>=41.0.0
+```
+
 ---
 
 ## 🚀 Quick Start (60 seconds)
