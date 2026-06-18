@@ -20,7 +20,7 @@ const MARKERS = {
  * Compiled regex patterns for sensitive data detection.
  * Ordered by specificity: more specific patterns first to avoid partial matches.
  */
-const PATTERNS: ReadonlyArray<{ regex: RegExp; replacement: string }> = [
+const PATTERNS: ReadonlyArray<{ regex: RegExp; replacement: string | ((match: string, ...args: any[]) => string) }> = [
   // Database connection strings (must run before generic path redaction)
   {
     regex: /(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis|mssql|mariadb|sqlite):\/\/[^\s'",)}\]]+/gi,

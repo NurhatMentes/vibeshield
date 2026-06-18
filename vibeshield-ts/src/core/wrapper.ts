@@ -61,7 +61,7 @@ function createSanitizedRequest(req: Request, options?: VibeShieldOptions): Requ
               .formData()
               .then((formData: FormData) => {
                 const cleanFormData = new FormData();
-                for (const [key, value] of formData.entries()) {
+                for (const [key, value] of (formData as any).entries()) {
                   if (typeof value === 'string') {
                     cleanFormData.append(key, sanitizeString(value, securityOpts));
                   } else {

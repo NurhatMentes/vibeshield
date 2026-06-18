@@ -39,7 +39,7 @@ export class VibeShieldCache {
     // Reconstruct the Response object using a Blob wrapping the cached body.
     // This allows the response to be read multiple times on different cache hits
     // without detaching the underlying cached ArrayBuffer.
-    return new Response(new Blob([cached.body]), {
+    return new Response(new Blob([cached.body as any]), {
       status: cached.status,
       statusText: cached.statusText,
       headers: new Headers(cached.headers),
@@ -67,13 +67,16 @@ export class VibeShieldCache {
       const responseClone = response.clone();
       const bodyBuffer = await responseClone.arrayBuffer();
       const body = new Uint8Array(bodyBuffer);
-      const headers = Array.from(responseClone.headers.entries());
+      const headersList: [string, string][] = [];
+      responseClone.headers.forEach((val, name) => {
+        headersList.push([name, val]);
+      });
 
       this.cache.set(key, {
         body,
         status: responseClone.status,
         statusText: responseClone.statusText,
-        headers,
+        headers: headersList,
         expiresAt: Date.now() + finalTtl * 1000,
       });
     } catch (e) {

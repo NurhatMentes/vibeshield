@@ -25,7 +25,7 @@ export function validatePayload(payload: any, schema: ValidationSchema): Validat
     }
 
     // Determine actual type
-    let actualType = typeof value;
+    let actualType: string = typeof value;
     if (actualType === 'object') {
       if (Array.isArray(value)) actualType = 'array';
     }
