@@ -34,3 +34,8 @@ export { validatePassword, calculateShannonEntropy, generatePasswordPolicyReport
 export { validatePasswordMiddleware } from './middleware/password-validator.js';
 export type { PasswordContext, PasswordValidationResult, PasswordPolicyOptions } from './core/password-protector.js';
 
+export { detectPromptInjection, sanitizeForLLM, detectPromptLeak, detectJailbreak, generateCanaryToken } from './core/prompt-shield.js';
+export type { PromptShieldResult, PromptShieldOptions, CanaryToken } from './core/prompt-shield.js';
+export { promptShieldMiddleware } from './middleware/prompt-shield-middleware.js';
+export type { PromptShieldMiddlewareOptions } from './middleware/prompt-shield-middleware.js';
+

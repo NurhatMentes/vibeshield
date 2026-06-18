@@ -36,6 +36,14 @@ from .password_protector import (
     COMMON_PASSWORDS,
 )
 from .middleware.password_validator import validate_password_policy
+from .prompt_shield import (
+    detect_prompt_injection,
+    sanitize_for_llm,
+    detect_prompt_leak,
+    detect_jailbreak,
+    generate_canary_token,
+)
+from .middleware.prompt_shield_middleware import prompt_shield as prompt_shield_middleware
 
 __all__ = [
     "VibeShieldASGIMiddleware",
@@ -78,6 +86,12 @@ __all__ = [
     "generate_password_policy_report",
     "COMMON_PASSWORDS",
     "validate_password_policy",
+    "detect_prompt_injection",
+    "sanitize_for_llm",
+    "detect_prompt_leak",
+    "detect_jailbreak",
+    "generate_canary_token",
+    "prompt_shield_middleware",
 ]
 
 
