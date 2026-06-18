@@ -76,9 +76,13 @@ export interface ValidationRule {
   required?: boolean;
   min?: number;
   max?: number;
-  format?: 'email';
+  format?: 'email' | 'uuid' | 'url' | 'ipv4' | 'ipv6' | 'date' | 'phone';
+  pattern?: RegExp;
+  enum?: any[];
   schema?: Record<string, ValidationRule>; // For nested objects
   elementSchema?: ValidationRule;          // For arrays containing objects or specific types
+  allowNull?: boolean;
+  trim?: boolean;
 }
 
 export type ValidationSchema = Record<string, ValidationRule>;
