@@ -345,3 +345,44 @@ async def test_fastapi_async_middleware_invalid():
     data = json.loads(res.body.decode('utf-8'))
     assert data["error"] == "Forbidden"
     assert data["details"]["safe"] is False
+
+
+# 43. prompt_shield_middleware: Flask auto canary injection
+def test_flask_middleware_auto_canary():
+    flask_mock = MagicMock()
+    flask_mock.request.is_json = True
+    flask_mock.request.get_json.return_value = {
+        "prompt": "Hello AI, write code.",
+        "systemPrompt": "You are a coding assistant."
+    }
+    flask_mock.request.method = "POST"
+
+    with patch.dict("sys.modules", {"flask": flask_mock}):
+        @prompt_shield_middleware()
+        def view():
+            return "success"
+
+        res = view()
+        assert res == "success"
+        # Check that prompt_shield_canary was attached to flask_request
+        assert flask_mock.request.prompt_shield_canary.startswith("CANARY_VIBESHIELD_")
+        # Check that flask_request._cached_json now has the modified systemPrompt containing the canary
+        assert flask_mock.request.prompt_shield_canary in flask_mock.request._cached_json["systemPrompt"]
+
+
+# 44. prompt_shield_middleware: FastAPI auto canary injection
+@pytest.mark.asyncio
+async def test_fastapi_middleware_auto_canary():
+    @prompt_shield_middleware()
+    async def endpoint(request):
+        return "success"
+
+    req = MockFastAPIRequest({
+        "prompt": "Hello AI.",
+        "system": "You are a summarization bot."
+    })
+    res = await endpoint(req)
+    assert res == "success"
+    assert req.state.prompt_shield_canary.startswith("CANARY_VIBESHIELD_")
+    assert req.state.prompt_shield_canary in req._json["system"]
+

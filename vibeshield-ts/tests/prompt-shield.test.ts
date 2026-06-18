@@ -328,5 +328,46 @@ describe('Prompt Shield', () => {
       expect(responseBody.error).toBe('Forbidden');
       expect(responseBody.message).toContain('Potential prompt injection');
     });
+
+    it('43. should inject automatic canary token into express request body if missing', () => {
+      const middleware = promptShieldMiddleware();
+      const req: any = {
+        body: {
+          prompt: 'Hello AI, please write a summary.',
+          systemPrompt: 'You are a professional editor.'
+        }
+      };
+      middleware(req, {}, () => {});
+      expect(req.promptShieldCanary).toMatch(/^CANARY_VIBESHIELD_[a-f0-9]{32}$/);
+      expect(req.body.systemPrompt).toContain('You are a professional editor.');
+      expect(req.body.systemPrompt).toContain(req.promptShieldCanary);
+    });
+
+    it('44. should inject automatic canary token into nextjs request proxy if missing', async () => {
+      const middleware = promptShieldMiddleware();
+      const handler = async (req: any) => {
+        const body = await req.json();
+        return { body, promptShieldCanary: req.promptShieldCanary };
+      };
+      const wrapped = middleware(handler);
+      const mockRequest = {
+        clone() {
+          return {
+            async json() {
+              return { prompt: 'Hello', system: 'You are a translator.' };
+            }
+          };
+        },
+        async json() {
+          return { prompt: 'Hello', system: 'You are a translator.' };
+        }
+      };
+
+      const result: any = await wrapped(mockRequest);
+      expect(result.promptShieldCanary).toMatch(/^CANARY_VIBESHIELD_[a-f0-9]{32}$/);
+      expect(result.body.system).toContain('You are a translator.');
+      expect(result.body.system).toContain(result.promptShieldCanary);
+    });
   });
 });
+

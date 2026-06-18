@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://www.typescriptlang.org/)
 [![Python](https://img.shields.io/badge/Python-3.9+-green.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/Tests-752%20passing-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-840%20passing-brightgreen.svg)]()
 [![CI](https://github.com/NurhatMentes/vibeshield/actions/workflows/test.yml/badge.svg)](https://github.com/NurhatMentes/vibeshield/actions)
 [![Dual Stack](https://img.shields.io/badge/Stack-TS%20%2B%20Python-purple.svg)]()
 
@@ -36,8 +36,8 @@ Modern AI coding assistants (Cursor, Claude, GitHub Copilot, Windsurf) can gener
 
 ## ✨ Why VibeShield?
 
-- 🛡️ **14 Security Modules** — Comprehensive protection across all attack vectors
-- 🧪 **752 Passing Tests** — Enterprise-grade reliability with dual-stack parity
+- 🛡️ **15 Security Modules** — Comprehensive protection across all attack vectors
+- 🧪 **840 Passing Tests** — Enterprise-grade reliability with dual-stack parity
 - ⚡ **70.7x Faster** — Built-in LRU cache with nanosecond monitoring
 - 🎯 **Zero Dependencies** — No supply-chain risk, serverless-friendly cold starts
 - 💸 **VibeBudgeter** — Financial circuit-breaker for AI/API costs
@@ -236,6 +236,41 @@ Enterprise password validation with **embedded blacklist** of top 200 common pas
 
 ---
 
+### 🤖 Phase 5 — AI Safety
+
+#### 🛡️ Prompt Injection Mitigation
+Detects and blocks OWASP #1 LLM vulnerability: Prompt Injection, Jailbreaking, and Prompt Leaking using zero-dependency heuristic scoring.
+
+- 🔍 **Multi-layer scoring:** 50+ patterns classifying risk (low, medium, high, critical)
+- 🧹 **Sanitization:** Wraps user input in delimiters and neutralizes injection patterns
+- 🕵️ **Leak Detection:** Uses canary tokens to identify system prompt leakage in LLM outputs
+- 🔌 **Middleware/Decorators:** Intercepts request bodies and injects canary tokens automatically
+
+**TypeScript Example:**
+```typescript
+import { promptShieldMiddleware } from '@vibeshield/core';
+
+app.post('/api/chat', promptShieldMiddleware({ threshold: 100 }), (req, res) => {
+  // Access automatically injected canary token
+  const canary = req.promptShieldCanary; 
+  res.json({ message: 'Success' });
+});
+```
+
+**Python Example:**
+```python
+from vibeshield.core import prompt_shield_middleware
+
+@app.post("/chat")
+@prompt_shield_middleware(threshold=100)
+def chat_endpoint():
+    # Access automatically injected canary token
+    canary = request.prompt_shield_canary
+    return {"status": "success"}
+```
+
+---
+
 ## 🎭 Injection Protection Matrix
 
 | Attack Type | Example Payload | VibeShield Action |
@@ -347,7 +382,7 @@ VibeShield ships with **native rules files** for every major AI coding assistant
 
 ## 🧪 Test Coverage
 
-**752 passing tests** with 100% dual-stack parity between TypeScript and Python.
+**840 passing tests** with 100% dual-stack parity between TypeScript and Python.
 
 | Module | TS Tests | Python Tests | Total |
 |--------|----------|--------------|-------|
@@ -361,8 +396,9 @@ VibeShield ships with **native rules files** for every major AI coding assistant
 | Schema Validator | 40 | 61 | 101 |
 | Authorization | 37 | 46 | 83 |
 | Password Policy | 39 | 37 | 76 |
+| Prompt Shield | 44 | 44 | 88 |
 | Core (Cache, Crypto, Budget, Sanitizer) | 71 | 51 | 122 |
-| **TOTAL** | **376** | **376** | **752** |
+| **TOTAL** | **420** | **420** | **840** |
 
 ```bash
 # TypeScript
@@ -434,16 +470,16 @@ vibeshield/
 
 ## 🗺️ Roadmap
 
-### ✅ Completed (Phases 1–4)
+### ✅ Completed (Phases 1–5)
 - [x] Dual-stack runtime core (TS + Python)
 - [x] Zero-dependency architecture
-- [x] 14 security modules with 752 tests
+- [x] 15 security modules with 840 tests
 - [x] AI assistant rules for 11+ platforms
 - [x] AES-256-GCM encryption
 - [x] VibeBudgeter financial circuit-breaker
+- [x] Prompt injection mitigation
 
 ### 🚧 In Progress (Phase 5)
-- [ ] Prompt injection mitigation
 - [ ] Dynamic token budget tuning
 - [ ] Adaptive rate-limiting (Token Bucket)
 - [ ] GraphQL support
