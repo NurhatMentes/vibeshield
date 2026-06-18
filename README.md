@@ -47,6 +47,9 @@ Modern AI coding assistants (Cursor, Claude, GitHub Copilot, Windsurf) can gener
 
 ## 📦 Installation
 
+> ⚠️ **Note:** VibeShield is currently in pre-release. npm/PyPI packages coming soon!
+> For now, install directly from GitHub or use local development setup.
+
 ### TypeScript / Next.js
 
 ```bash
